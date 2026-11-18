@@ -1,0 +1,49 @@
+# Ambienti virtuali
+.venv/
+venv/
+env/
+
+# Bytecode e cache Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+
+# Build e distribuzione
+build/
+dist/
+*.whl
+
+# Strumenti di qualità del codice e test
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Output generati dalle esecuzioni
+output/*
+!output/.gitkeep
+
+# Segreti e configurazioni locali
+.env
+.env.*
+*.lic
+
+# Log e file temporanei
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Editor e IDE
+.vscode/
+.idea/
+*.swp
+
+# Solver: file di modello e log di Gurobi
+gurobi.log
+*.lp
+*.mps
+*.ilp
