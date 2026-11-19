@@ -122,8 +122,8 @@ def test_unknown_resource_is_an_error() -> None:
         ledger.timeline(ArcKey("S2", "S1"))
 
 
-def test_available_from_is_zero_for_now() -> None:
-    assert _ledger().available_from("S1") == 0.0
+def test_not_before_is_zero_for_now() -> None:
+    assert _ledger().not_before("S1") == 0.0
 
 
 def test_writing_after_the_block_has_ended_is_an_error_and_changes_nothing() -> None:

@@ -6,7 +6,7 @@ inside a transaction: it is visible to readers of the ledger, and it is discarde
 transaction is committed.
 
 Online state (the instant from which each satellite is available) will be preloaded
-into the committed layer here; for now every node is available from time 0.
+into the committed layer here; for now every node may be used from time 0.
 """
 
 from __future__ import annotations
@@ -66,8 +66,12 @@ class ResourceLedger:
         committed = self._plmm.get(node, ())
         return (*committed, *self._pending_plmm.get(node, ()))
 
-    def available_from(self, node: NodeId) -> float:
-        """Instant from which ``node`` can be used. Always 0.0 for now."""
+    def not_before(self, node: NodeId) -> float:
+        """Earliest instant at which ``node`` may be used, as a single lower bound.
+
+        Its usage windows are checked separately, by the code that schedules on it. Always
+        0.0 for now: online state will raise it.
+        """
         return 0.0
 
     @contextmanager
