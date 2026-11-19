@@ -1,4 +1,4 @@
-"""Common interface of the solvers: MILP and heuristic return the same kind of solution."""
+"""Common interface of the solvers: MILP and the priority-EDF / EFT heuristic return the same kind of solution."""
 
 from __future__ import annotations
 
