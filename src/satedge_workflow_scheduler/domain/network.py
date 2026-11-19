@@ -5,12 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import cached_property
 
-from satedge_workflow_scheduler.domain.errors import InstanceError
+from satedge_workflow_scheduler.common.errors import InstanceError
+from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.nodes import GroundStation, NodeId, Satellite
-from satedge_workflow_scheduler.domain.window import (
-    TimeWindow,
-    validate_window_sequence,
-)
 
 
 @dataclass(frozen=True)
@@ -57,7 +54,10 @@ class WindowedAvailability:
     windows: tuple[TimeWindow, ...]
 
     def __post_init__(self) -> None:
-        validate_window_sequence(self.windows, "visibility windows")
+        try:
+            WindowSet(self.windows)
+        except ValueError as error:
+            raise InstanceError(f"visibility windows: {error}") from error
 
 
 type Availability = AlwaysAvailable | WindowedAvailability

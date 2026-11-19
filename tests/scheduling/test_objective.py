@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from satedge_workflow_scheduler.domain.errors import InstanceError
+from satedge_workflow_scheduler.common.errors import InstanceError
+from satedge_workflow_scheduler.common.intervals import TimeWindow
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
@@ -13,7 +14,6 @@ from satedge_workflow_scheduler.domain.network import (
 from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
 from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
 from satedge_workflow_scheduler.domain.solution import RequestOutcome
-from satedge_workflow_scheduler.domain.window import TimeWindow
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
 from satedge_workflow_scheduler.scheduling.objective import evaluate, tardiness
 

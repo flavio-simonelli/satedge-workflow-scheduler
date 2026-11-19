@@ -6,13 +6,13 @@ from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from satedge_workflow_scheduler.domain.errors import SolverError
+from satedge_workflow_scheduler.common.errors import SolverError
+from satedge_workflow_scheduler.common.intervals import TIME_TOLERANCE
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import Network
 from satedge_workflow_scheduler.domain.nodes import NodeId
 from satedge_workflow_scheduler.domain.requests import Request
 from satedge_workflow_scheduler.domain.solution import TaskExecution, Transfer
-from satedge_workflow_scheduler.domain.window import TIME_TOLERANCE
 
 
 @dataclass(frozen=True, slots=True)

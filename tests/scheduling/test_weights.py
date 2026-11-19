@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from satedge_workflow_scheduler.domain.errors import InstanceError
+from satedge_workflow_scheduler.common.errors import InstanceError
 from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
 from satedge_workflow_scheduler.scheduling.weights import (
     rejection_weights,

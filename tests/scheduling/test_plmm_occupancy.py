@@ -4,7 +4,8 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from satedge_workflow_scheduler.domain.errors import SolverError
+from satedge_workflow_scheduler.common.errors import SolverError
+from satedge_workflow_scheduler.common.intervals import TimeWindow
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
@@ -15,7 +16,6 @@ from satedge_workflow_scheduler.domain.network import (
 from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
 from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
 from satedge_workflow_scheduler.domain.solution import TaskExecution, Transfer
-from satedge_workflow_scheduler.domain.window import TimeWindow
 from satedge_workflow_scheduler.scheduling.plmm_occupancy import (
     PlmmOccupancyInterval,
     fits_capacity,

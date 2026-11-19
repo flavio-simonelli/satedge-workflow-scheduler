@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from satedge_workflow_scheduler.domain.window import TimeWindow
+from satedge_workflow_scheduler.common.intervals import TimeWindow
 
 
 class BusyTimeline:

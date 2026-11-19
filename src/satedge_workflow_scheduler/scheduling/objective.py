@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from satedge_workflow_scheduler.domain.errors import InstanceError
+from satedge_workflow_scheduler.common.errors import InstanceError
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.requests import Request
 from satedge_workflow_scheduler.domain.solution import RequestOutcome

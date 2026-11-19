@@ -16,10 +16,10 @@ from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from satedge_workflow_scheduler.domain.errors import SolverError
+from satedge_workflow_scheduler.common.errors import SolverError
+from satedge_workflow_scheduler.common.intervals import TimeWindow
 from satedge_workflow_scheduler.domain.network import Network
 from satedge_workflow_scheduler.domain.nodes import NodeId
-from satedge_workflow_scheduler.domain.window import TimeWindow
 from satedge_workflow_scheduler.scheduling.plmm_occupancy import PlmmOccupancyInterval
 from satedge_workflow_scheduler.solvers.priority_edf_eft.timeline import BusyTimeline
 

@@ -4,11 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from satedge_workflow_scheduler.domain.errors import InstanceError
-from satedge_workflow_scheduler.domain.window import (
-    TimeWindow,
-    validate_window_sequence,
-)
+from satedge_workflow_scheduler.common.errors import InstanceError
+from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 
 type NodeId = str
 
@@ -36,7 +33,10 @@ class Satellite:
             raise InstanceError(f"satellite {self.id}: PLMM capacity must be > 0")
         if self.hpc_write_rate <= 0:
             raise InstanceError(f"satellite {self.id}: HPC write rate must be > 0")
-        validate_window_sequence(self.hpc_windows, f"HPC of satellite {self.id}")
+        try:
+            WindowSet(self.hpc_windows)
+        except ValueError as error:
+            raise InstanceError(f"HPC of satellite {self.id}: {error}") from error
 
     def write_time(self, size: float) -> float:
         """Time in seconds to write ``size`` Gb from the HPC into the PLMM."""

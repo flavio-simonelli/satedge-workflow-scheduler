@@ -4,8 +4,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from satedge_workflow_scheduler.domain.errors import InstanceError
-from satedge_workflow_scheduler.domain.window import TimeWindow
+from satedge_workflow_scheduler.common.intervals import TimeWindow
 from satedge_workflow_scheduler.solvers.priority_edf_eft.timeline import BusyTimeline
 
 EPS = 1e-9
@@ -47,7 +46,7 @@ def test_with_reserved_returns_a_copy() -> None:
 
 
 def test_window_end_before_start_is_rejected() -> None:
-    with pytest.raises(InstanceError):
+    with pytest.raises(ValueError):
         TimeWindow(5.0, 4.0)
 
 
