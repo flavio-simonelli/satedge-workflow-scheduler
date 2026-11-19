@@ -1,9 +1,10 @@
-"""PLMM occupancy of the data of a schedule, and the peak load of a set of occupancies."""
+"""PLMM occupancy of the data of a schedule, and the load profile of the PLMM of each satellite."""
 
 from __future__ import annotations
 
+import itertools
 from collections import defaultdict
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from satedge_workflow_scheduler.common.errors import SolverError
@@ -49,8 +50,9 @@ def plmm_intervals(
     holds occupancies. Empty intervals are dropped.
 
     Raises:
-        SolverError: If a data item that must reach a task or the ground does not have a
-            complete chain of transfers.
+        SolverError: If a data item does not reach the satellite of the task that uses it.
+            The final output is not checked here: its chain is not required to end at the
+            ground station.
     """
     executions_by_request: dict[str, dict[int, TaskExecution]] = defaultdict(dict)
     for execution in executions:
@@ -129,51 +131,62 @@ def _add(
     result[node].append(PlmmOccupancyInterval(request_id, position, size, start, end))
 
 
-def peak_load(
-    items: Iterable[PlmmOccupancyInterval], eps: float = TIME_TOLERANCE
-) -> float:
-    """Return the maximum total size of the data present at the same time.
+@dataclass(frozen=True, slots=True)
+class LoadSegment:
+    """A time segment over which the PLMM load of a satellite is constant.
 
-    Intervals are half-open. Events closer than ``eps`` are simultaneous: releases are
-    applied before arrivals, so data leaving at ``t`` and data entering at ``t`` do not
-    add up.
+    Attributes:
+        start: Start of the segment in seconds.
+        end: End of the segment in seconds. Half-open, ``[start, end)``.
+        load: Total size in Gb of the data present during the segment.
+        items: The data present during the segment.
     """
-    events: list[tuple[float, float]] = []
-    for item in items:
-        events.append((item.start, item.size))
-        events.append((item.end, -item.size))
-    if not events:
-        return 0.0
 
-    events.sort(key=lambda e: e[0])
-    best = 0.0
-    load = 0.0
-    group: list[tuple[float, float]] = []
-    for event in events:
-        if group and event[0] - group[-1][0] > eps:
-            load, best = _flush(group, load, best)
-            group = []
-        group.append(event)
-    _, best = _flush(group, load, best)
-    return best
+    start: float
+    end: float
+    load: float
+    items: tuple[PlmmOccupancyInterval, ...]
 
 
-def _flush(
-    group: Sequence[tuple[float, float]], load: float, best: float
-) -> tuple[float, float]:
-    """Apply one group of simultaneous events: releases first, then arrivals."""
-    for _, delta in group:
-        if delta < 0:
-            load += delta
-    for _, delta in group:
-        if delta > 0:
-            load += delta
-            best = max(best, load)
-    return load, best
+def load_profile(
+    items: Iterable[PlmmOccupancyInterval], eps: float = TIME_TOLERANCE
+) -> tuple[LoadSegment, ...]:
+    """Return the PLMM load as consecutive segments, in time order.
+
+    The profile changes only at the instants where an item starts or ends. Instants closer
+    than ``eps`` are the same instant. Segments with no data are omitted.
+    """
+    items = tuple(items)
+    times = sorted(t for item in items for t in (item.start, item.end))
+    instants: list[float] = []
+    for t in times:
+        if not instants or t - instants[-1] > eps:
+            instants.append(t)
+
+    segments: list[LoadSegment] = []
+    for start, end in itertools.pairwise(instants):
+        present = tuple(
+            item
+            for item in items
+            if item.start <= start + eps and item.end >= end - eps
+        )
+        if present:
+            load = sum(item.size for item in present)
+            segments.append(LoadSegment(start, end, load, present))
+    return tuple(segments)
 
 
-def fits_capacity(
-    items: Iterable[PlmmOccupancyInterval], capacity: float, eps: float = TIME_TOLERANCE
+def overloads(
+    profile: Iterable[LoadSegment], capacity: float, eps: float = TIME_TOLERANCE
+) -> tuple[LoadSegment, ...]:
+    """Return the segments of ``profile`` whose load exceeds ``capacity``, up to ``eps``."""
+    return tuple(segment for segment in profile if segment.load > capacity + eps)
+
+
+def within_capacity(
+    items: Iterable[PlmmOccupancyInterval],
+    capacity: float,
+    eps: float = TIME_TOLERANCE,
 ) -> bool:
-    """Whether the peak load of ``items`` stays within ``capacity``, up to ``eps``."""
-    return peak_load(items, eps) <= capacity + eps
+    """Whether the PLMM load of ``items`` stays within ``capacity``, up to ``eps``."""
+    return not overloads(load_profile(items, eps), capacity, eps)

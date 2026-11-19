@@ -18,10 +18,16 @@ from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
 from satedge_workflow_scheduler.domain.solution import TaskExecution, Transfer
 from satedge_workflow_scheduler.scheduling.plmm_occupancy import (
     PlmmOccupancyInterval,
-    fits_capacity,
-    peak_load,
+    load_profile,
+    overloads,
     plmm_intervals,
+    within_capacity,
 )
+
+
+def _peak(items: list[PlmmOccupancyInterval]) -> float:
+    """Largest load of the profile, 0 when there is no data."""
+    return max((segment.load for segment in load_profile(items)), default=0.0)
 
 
 def _sat(sid: str) -> Satellite:
@@ -123,17 +129,17 @@ def test_data_not_reaching_its_task_satellite_is_an_error() -> None:
 def test_half_open_intervals_do_not_overlap_at_the_boundary() -> None:
     leaving = PlmmOccupancyInterval("a", 0, 2.0, start=0.0, end=5.0)
     entering = PlmmOccupancyInterval("b", 0, 3.0, start=5.0, end=10.0)
-    assert peak_load([leaving, entering]) == pytest.approx(3.0)
+    assert _peak([leaving, entering]) == pytest.approx(3.0)
 
 
 def test_overlapping_intervals_add_up() -> None:
     a = PlmmOccupancyInterval("a", 0, 2.0, start=0.0, end=5.0)
     b = PlmmOccupancyInterval("b", 0, 3.0, start=4.0, end=10.0)
-    assert peak_load([a, b]) == pytest.approx(5.0)
+    assert _peak([a, b]) == pytest.approx(5.0)
 
 
 def test_peak_of_nothing_is_zero() -> None:
-    assert peak_load([]) == 0.0
+    assert _peak([]) == 0.0
 
 
 def test_fits_compares_peak_with_capacity() -> None:
@@ -141,8 +147,8 @@ def test_fits_compares_peak_with_capacity() -> None:
         PlmmOccupancyInterval("a", 0, 2.0, start=0.0, end=5.0),
         PlmmOccupancyInterval("b", 0, 3.0, start=4.0, end=10.0),
     ]
-    assert fits_capacity(items, capacity=5.0)
-    assert not fits_capacity(items, capacity=4.0)
+    assert within_capacity(items, capacity=5.0)
+    assert not within_capacity(items, capacity=4.0)
 
 
 _interval = st.tuples(
@@ -160,7 +166,7 @@ def test_peak_is_between_largest_size_and_total_size(
         PlmmOccupancyInterval("r", i, size, start=start, end=start + length)
         for i, (start, length, size) in enumerate(raw)
     ]
-    value = peak_load(items)
+    value = _peak(items)
     sizes = [item.size for item in items]
     assert value >= max(sizes) - 1e-9
     assert value <= sum(sizes) + 1e-9
@@ -172,4 +178,26 @@ def test_disjoint_intervals_peak_is_the_largest_size(sizes: list[float]) -> None
         PlmmOccupancyInterval("r", i, size, start=2.0 * i, end=2.0 * i + 1.0)
         for i, size in enumerate(sizes)
     ]
-    assert peak_load(items) == pytest.approx(max(sizes))
+    assert _peak(items) == pytest.approx(max(sizes))
+
+
+def test_load_profile_splits_time_where_data_starts_or_ends() -> None:
+    a = PlmmOccupancyInterval("a", 0, 2.0, start=0.0, end=5.0)
+    b = PlmmOccupancyInterval("b", 0, 3.0, start=4.0, end=10.0)
+    segments = load_profile([a, b])
+    assert [(s.start, s.end, s.load) for s in segments] == [
+        (0.0, 4.0, 2.0),
+        (4.0, 5.0, 5.0),
+        (5.0, 10.0, 3.0),
+    ]
+    assert segments[1].items == (a, b)
+
+
+def test_overloads_return_the_segments_above_capacity_with_their_data() -> None:
+    a = PlmmOccupancyInterval("a", 0, 2.0, start=0.0, end=5.0)
+    b = PlmmOccupancyInterval("b", 0, 3.0, start=4.0, end=10.0)
+    profile = load_profile([a, b])
+    over = overloads(profile, capacity=4.0)
+    assert [(s.start, s.end, s.load) for s in over] == [(4.0, 5.0, 5.0)]
+    assert over[0].items == (a, b)
+    assert overloads(profile, capacity=5.0) == ()
