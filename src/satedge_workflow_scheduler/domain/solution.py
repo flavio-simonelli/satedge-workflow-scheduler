@@ -98,6 +98,25 @@ class RequestOutcome:
 
 
 @dataclass(frozen=True)
+class ObjectiveValue:
+    """Value of the objective of a schedule, with its two terms kept apart.
+
+    Attributes:
+        primary: The lexicographically first term: the weighted rejections (hard) or the
+            weighted tardiness (soft).
+        response: The total response time of the accepted requests, delivery minus
+            release, without the tie-break weight.
+    """
+
+    primary: float
+    response: float
+
+    def total(self, eps: float) -> float:
+        """Single value minimised by a solver: ``primary + eps * response``."""
+        return self.primary + eps * self.response
+
+
+@dataclass(frozen=True)
 class Solution:
     """A complete schedule for an instance.
 
@@ -106,14 +125,14 @@ class Solution:
         executions: Executions of the tasks of the accepted requests.
         transfers: Transmissions of the data of the accepted requests.
         status: Status reported by the solver.
-        objective: Value of the objective, if the solver reports one.
+        objective: Value of the objective, with its terms, if the solver reports one.
     """
 
     outcomes: tuple[RequestOutcome, ...]
     executions: tuple[TaskExecution, ...]
     transfers: tuple[Transfer, ...]
     status: SolveStatus
-    objective: float | None = None
+    objective: ObjectiveValue | None = None
 
     def outcome(self, request_id: str) -> RequestOutcome:
         """Return the outcome of the request with identifier ``request_id``."""

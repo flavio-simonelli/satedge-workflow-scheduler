@@ -1,4 +1,4 @@
-"""Objective of a schedule, evaluated for each deadline mode."""
+"""Objective of a schedule, evaluated for each deadline mode, with its terms kept apart."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from satedge_workflow_scheduler.common.errors import SolverError
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.requests import Request
-from satedge_workflow_scheduler.domain.solution import RequestOutcome
+from satedge_workflow_scheduler.domain.solution import ObjectiveValue, RequestOutcome
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
 from satedge_workflow_scheduler.scheduling.weights import (
     rejection_weights,
@@ -24,11 +24,13 @@ def tardiness(outcome: RequestOutcome, request: Request) -> float:
 
 def evaluate(
     instance: ProblemInstance, outcomes: Sequence[RequestOutcome], mode: DeadlineMode
-) -> float:
-    """Return the objective value of the outcomes of ``instance``.
+) -> ObjectiveValue:
+    """Return the objective of the outcomes of ``instance``, as two separate terms.
 
-    ``HARD``: the sum of ``κ_r`` over the rejected requests (to be minimised).
-    ``SOFT``: the sum of ``w_r * tardiness_r`` over all requests (to be minimised).
+    ``primary``: in ``HARD`` mode the sum of ``κ_r`` over the rejected requests; in ``SOFT``
+    mode the sum of ``w_r * tardiness_r`` over all requests.
+    ``response``: the sum of ``delivery - release`` over the accepted requests. Rejected
+    requests have no delivery and contribute zero.
 
     Raises:
         SolverError: If an outcome refers to a request that is not in the instance.
@@ -40,9 +42,17 @@ def evaluate(
 
     if mode is DeadlineMode.HARD:
         costs = rejection_weights(instance.requests)
-        return sum(costs[o.request_id] for o in outcomes if not o.accepted)
+        primary = sum(costs[o.request_id] for o in outcomes if not o.accepted)
+    else:
+        weights = tardiness_weights(instance.requests, instance.horizon)
+        primary = sum(
+            weights[o.request_id] * tardiness(o, requests[o.request_id])
+            for o in outcomes
+        )
 
-    weights = tardiness_weights(instance.requests, instance.horizon)
-    return sum(
-        weights[o.request_id] * tardiness(o, requests[o.request_id]) for o in outcomes
+    response = sum(
+        o.delivery_time - requests[o.request_id].release
+        for o in outcomes
+        if o.accepted and o.delivery_time is not None
     )
+    return ObjectiveValue(primary=float(primary), response=float(response))

@@ -80,7 +80,7 @@ def test_hard_objective_sums_rejection_costs() -> None:
         RequestOutcome("n2", accepted=False),
     ]
     # κ_n1 = κ_n2 = 1 (|N| = 2 non urgent requests, urgent has |N|+1 = 3)
-    assert evaluate(instance, outcomes, DeadlineMode.HARD) == pytest.approx(2.0)
+    assert evaluate(instance, outcomes, DeadlineMode.HARD).primary == pytest.approx(2.0)
 
 
 def test_hard_objective_of_rejected_urgent_request() -> None:
@@ -90,7 +90,7 @@ def test_hard_objective_of_rejected_urgent_request() -> None:
         RequestOutcome("u", accepted=False),
         RequestOutcome("n", accepted=True, delivery_time=10.0),
     ]
-    assert evaluate(instance, outcomes, DeadlineMode.HARD) == pytest.approx(2.0)
+    assert evaluate(instance, outcomes, DeadlineMode.HARD).primary == pytest.approx(2.0)
 
 
 def test_soft_objective_is_weighted_tardiness() -> None:
@@ -102,10 +102,38 @@ def test_soft_objective_is_weighted_tardiness() -> None:
         RequestOutcome("n", accepted=True, delivery_time=50.0),  # tardiness 10
     ]
     expected = 61.0 * 10.0 + 1.0 * 10.0
-    assert evaluate(instance, outcomes, DeadlineMode.SOFT) == pytest.approx(expected)
+    assert evaluate(instance, outcomes, DeadlineMode.SOFT).primary == pytest.approx(
+        expected
+    )
 
 
 def test_evaluate_rejects_unknown_request() -> None:
     instance = _instance((_request("n", N, 50.0),))
     with pytest.raises(SolverError):
         evaluate(instance, [RequestOutcome("ghost", False)], DeadlineMode.HARD)
+
+
+def test_response_term_is_kept_apart_from_the_primary_term() -> None:
+    requests = (_request("u", U, 50.0), _request("n", N, 50.0))
+    instance = _instance(requests)
+    outcomes = [
+        RequestOutcome("u", accepted=True, delivery_time=10.0),
+        RequestOutcome("n", accepted=True, delivery_time=30.0),
+    ]
+    value = evaluate(instance, outcomes, DeadlineMode.HARD)
+    # no rejections: primary 0; response (10 - 0) + (30 - 0) = 40
+    assert value.primary == pytest.approx(0.0)
+    assert value.response == pytest.approx(40.0)
+    assert value.total(eps=0.5) == pytest.approx(20.0)
+
+
+def test_rejected_requests_contribute_no_response_time() -> None:
+    requests = (_request("u", U, 50.0), _request("n", N, 50.0))
+    instance = _instance(requests)
+    outcomes = [
+        RequestOutcome("u", accepted=False),
+        RequestOutcome("n", accepted=True, delivery_time=30.0),
+    ]
+    value = evaluate(instance, outcomes, DeadlineMode.HARD)
+    assert value.primary == pytest.approx(2.0)
+    assert value.response == pytest.approx(30.0)
