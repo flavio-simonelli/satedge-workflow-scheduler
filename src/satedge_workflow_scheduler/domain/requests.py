@@ -24,7 +24,7 @@ class Task:
     Attributes:
         duration: Computing time on the HPC, in seconds, container start-up excluded (> 0).
         output_size: Size in Gb of the data produced by the task, which is the input of the
-            next task or, for the last task, the final output (>= 0).
+            next task or, for the last task, the final output (> 0).
     """
 
     duration: float
@@ -35,9 +35,9 @@ class Task:
             raise InstanceError(
                 f"task duration must be finite and > 0, got {self.duration}"
             )
-        if not (math.isfinite(self.output_size) and self.output_size >= 0):
+        if not (math.isfinite(self.output_size) and self.output_size > 0):
             raise InstanceError(
-                f"task output size must be finite and >= 0, got {self.output_size}"
+                f"task output size must be finite and > 0, got {self.output_size}"
             )
 
 
@@ -51,7 +51,7 @@ class Request:
         origin: Satellite holding the raw data.
         release: Instant, in seconds, from which the raw data is available (>= 0).
         deadline: Absolute deadline, in seconds, for the delivery of the output to ground (>= 0).
-        raw_size: Size in Gb of the raw data (>= 0).
+        raw_size: Size in Gb of the raw data (> 0).
         tasks: The pipeline, in execution order (at least one task).
     """
 
@@ -74,8 +74,8 @@ class Request:
             raise InstanceError(f"request {self.id}: release must be finite and >= 0")
         if not (math.isfinite(self.deadline) and self.deadline >= 0):
             raise InstanceError(f"request {self.id}: deadline must be finite and >= 0")
-        if not (math.isfinite(self.raw_size) and self.raw_size >= 0):
-            raise InstanceError(f"request {self.id}: raw size must be finite and >= 0")
+        if not (math.isfinite(self.raw_size) and self.raw_size > 0):
+            raise InstanceError(f"request {self.id}: raw size must be finite and > 0")
 
     @property
     def output_size(self) -> float:
