@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from satedge_workflow_scheduler.domain.errors import InstanceError
@@ -17,14 +18,21 @@ class ProblemInstance:
         network: Orbital planes, ground station and arcs with their availability.
         requests: The requests. Their order defines the FIFO tie-break between requests of
             the same priority class.
+        horizon: Delivery horizon ``H`` in seconds: the latest instant an output can reach
+            the ground station. It is the limit of the soft deadline and it is independent of
+            the request deadlines.
         name: Optional name of the instance.
     """
 
     network: Network
     requests: tuple[Request, ...]
+    horizon: float
     name: str = ""
 
     def __post_init__(self) -> None:
+        if not (math.isfinite(self.horizon) and self.horizon > 0):
+            raise InstanceError(f"horizon must be finite and > 0, got {self.horizon}")
+
         seen: set[str] = set()
         for request in self.requests:
             if request.id in seen:
@@ -42,8 +50,3 @@ class ProblemInstance:
             if request.id == request_id:
                 return request
         raise InstanceError(f"unknown request {request_id!r}")
-
-    @property
-    def horizon(self) -> float:
-        """Latest deadline of the instance, in seconds (0 without requests)."""
-        return max((request.deadline for request in self.requests), default=0.0)
