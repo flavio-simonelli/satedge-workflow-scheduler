@@ -80,11 +80,14 @@ class RequestOutcome:
         accepted: Whether the request is served.
         delivery_time: Instant in seconds at which the final output reaches the ground
             station. Set if and only if the request is accepted.
+        rejection_reason: Why the request was rejected, when the solver gives one. Set only
+            if the request is rejected.
     """
 
     request_id: str
     accepted: bool
     delivery_time: float | None = None
+    rejection_reason: str | None = None
 
     def __post_init__(self) -> None:
         if self.accepted and self.delivery_time is None:
@@ -94,6 +97,10 @@ class RequestOutcome:
         if not self.accepted and self.delivery_time is not None:
             raise InstanceError(
                 f"request {self.request_id} is rejected but has a delivery time"
+            )
+        if self.accepted and self.rejection_reason is not None:
+            raise InstanceError(
+                f"request {self.request_id} is accepted but has a rejection reason"
             )
 
 
