@@ -124,3 +124,14 @@ def test_unknown_resource_is_an_error() -> None:
 
 def test_available_from_is_zero_for_now() -> None:
     assert _ledger().available_from("S1") == 0.0
+
+
+def test_writing_after_the_block_has_ended_is_an_error_and_changes_nothing() -> None:
+    ledger = _ledger()
+    with ledger.transaction() as tx:
+        pass
+    with pytest.raises(RuntimeError):
+        tx.reserve(HpcKey("S1"), TimeWindow(0.0, 10.0))
+    with pytest.raises(RuntimeError):
+        tx.commit()
+    assert ledger.timeline(HpcKey("S1")).windows == ()

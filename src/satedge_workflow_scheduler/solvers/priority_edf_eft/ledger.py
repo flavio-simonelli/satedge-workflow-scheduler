@@ -84,6 +84,7 @@ class ResourceLedger:
         try:
             yield tx
         finally:
+            tx._close()
             self._pending_intervals.clear()
             self._pending_plmm.clear()
             self._in_transaction = False
@@ -114,13 +115,15 @@ class Transaction:
 
     def __init__(self, ledger: ResourceLedger) -> None:
         self._ledger = ledger
+        self._open = True
         self._committed = False
 
     def reserve(self, key: ResourceKey, interval: TimeWindow) -> None:
         """Add a tentative busy interval on a resource.
 
         Raises:
-            RuntimeError: If the transaction has already been committed.
+            RuntimeError: If the transaction has already been committed or its block has
+                ended.
         """
         self._check_open()
         self._ledger._check_key(key)
@@ -132,7 +135,8 @@ class Transaction:
         """Add tentative PLMM occupancies on a satellite.
 
         Raises:
-            RuntimeError: If the transaction has already been committed.
+            RuntimeError: If the transaction has already been committed or its block has
+                ended.
         """
         self._check_open()
         self._ledger._pending_plmm[node].extend(items)
@@ -141,12 +145,18 @@ class Transaction:
         """Make the tentative reservations permanent. The transaction is then closed.
 
         Raises:
-            RuntimeError: If the transaction has already been committed.
+            RuntimeError: If the transaction has already been committed or its block has
+                ended.
         """
         self._check_open()
         self._ledger._commit()
         self._committed = True
 
+    def _close(self) -> None:
+        self._open = False
+
     def _check_open(self) -> None:
         if self._committed:
             raise RuntimeError("the transaction has already been committed")
+        if not self._open:
+            raise RuntimeError("the transaction is closed: its block has already ended")
