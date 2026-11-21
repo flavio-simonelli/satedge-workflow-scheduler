@@ -21,13 +21,13 @@ def assert_valid(instance: ProblemInstance, solution: Solution) -> None:
     """Check the constraints of the model on a solution, failing with a message if violated."""
     network = instance.network
     requests = {r.id: r for r in instance.requests}
-    executions = {(e.request_id, e.position): e for e in solution.executions}
-    transfers = list(solution.transfers)
+    executions = {(e.request_id, e.position): e for e in solution.schedule.executions}
+    transfers = list(solution.schedule.transfers)
 
     for outcome in solution.outcomes:
         if not outcome.accepted:
             assert not any(
-                e.request_id == outcome.request_id for e in solution.executions
+                e.request_id == outcome.request_id for e in solution.schedule.executions
             )
             continue
         request = requests[outcome.request_id]
@@ -52,7 +52,9 @@ def assert_valid(instance: ProblemInstance, solution: Solution) -> None:
     # no overlap on any HPC
     for sat in network.satellites:
         spans = sorted(
-            (e.start, e.end) for e in solution.executions if e.satellite == sat.id
+            (e.start, e.end)
+            for e in solution.schedule.executions
+            if e.satellite == sat.id
         )
         for (_, end_a), (start_b, _) in itertools.pairwise(spans):
             assert end_a <= start_b + EPS, f"HPC of {sat.id} runs two tasks at once"
@@ -77,7 +79,9 @@ def assert_valid(instance: ProblemInstance, solution: Solution) -> None:
                 ), f"transfer on {arc.name} outside its visibility windows"
 
     # PLMM capacity of every satellite, over the whole horizon
-    occupancies = plmm_intervals(instance, solution.executions, solution.transfers)
+    occupancies = plmm_intervals(
+        instance, solution.schedule.executions, solution.schedule.transfers
+    )
     for sat in network.satellites:
         profile = load_profile(occupancies.get(sat.id, []))
         assert not overloads(profile, sat.plmm_capacity), f"PLMM of {sat.id} overflows"

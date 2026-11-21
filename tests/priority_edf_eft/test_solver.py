@@ -107,11 +107,11 @@ def test_hard_mode_rejects_an_impossible_request_without_disturbing_the_others(
 
     assert not together.outcome("b").accepted
     assert together.outcome("a") == alone.outcome("a")
-    assert [e for e in together.executions if e.request_id == "a"] == list(
-        alone.executions
+    assert [e for e in together.schedule.executions if e.request_id == "a"] == list(
+        alone.schedule.executions
     )
-    assert [t for t in together.transfers if t.request_id == "a"] == list(
-        alone.transfers
+    assert [t for t in together.schedule.transfers if t.request_id == "a"] == list(
+        alone.schedule.transfers
     )
     # rejecting the only non urgent request costs its κ, which is 1
     assert together.objective is not None

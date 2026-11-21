@@ -11,6 +11,7 @@ from satedge_workflow_scheduler.domain.nodes import NodeId
 from satedge_workflow_scheduler.domain.solution import (
     ObjectiveValue,
     RequestOutcome,
+    Schedule,
     Solution,
     SolveStatus,
     TaskExecution,
@@ -183,9 +184,8 @@ class PriorityEdfEftSolver:
 
         value: ObjectiveValue = evaluate(instance, outcomes, self._mode)
         return Solution(
+            schedule=Schedule(tuple(executions), tuple(transfers)),
             outcomes=tuple(outcomes),
-            executions=tuple(executions),
-            transfers=tuple(transfers),
             status=SolveStatus.FEASIBLE,
             objective=value,
         )

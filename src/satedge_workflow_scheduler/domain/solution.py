@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -72,6 +73,48 @@ class Transfer:
 
 
 @dataclass(frozen=True)
+class Schedule:
+    """A calendar: the task executions and the data transmissions of some requests.
+
+    The same type is the committed calendar of an instance and the calendar of a solution:
+    the calendar of the next epoch is the one of the solution, restricted to the requests
+    not yet delivered (:meth:`restricted_to`).
+
+    Attributes:
+        executions: Executions of the tasks, at most one per task of a request.
+        transfers: Transmissions of the data, at most one per data item of a request and
+            arc.
+    """
+
+    executions: tuple[TaskExecution, ...] = ()
+    transfers: tuple[Transfer, ...] = ()
+
+    def __post_init__(self) -> None:
+        tasks = [(e.request_id, e.position) for e in self.executions]
+        if len(set(tasks)) != len(tasks):
+            raise InstanceError("a task of a request is executed more than once")
+        hops = [(t.request_id, t.position, t.source, t.target) for t in self.transfers]
+        if len(set(hops)) != len(hops):
+            raise InstanceError(
+                "a data item of a request uses the same arc more than once"
+            )
+
+    @property
+    def request_ids(self) -> frozenset[str]:
+        """Identifiers of the requests that appear in the calendar."""
+        ids = {e.request_id for e in self.executions}
+        return frozenset(ids | {t.request_id for t in self.transfers})
+
+    def restricted_to(self, request_ids: Iterable[str]) -> Schedule:
+        """The calendar of the requests in ``request_ids`` only, in the same order."""
+        keep = frozenset(request_ids)
+        return Schedule(
+            tuple(e for e in self.executions if e.request_id in keep),
+            tuple(t for t in self.transfers if t.request_id in keep),
+        )
+
+
+@dataclass(frozen=True)
 class RequestOutcome:
     """Result for one request.
 
@@ -125,21 +168,32 @@ class ObjectiveValue:
 
 @dataclass(frozen=True)
 class Solution:
-    """A complete schedule for an instance.
+    """The result of a solver for an instance.
 
     Attributes:
+        schedule: Calendar of the accepted requests, committed ones included. The requests
+            that appear in it are exactly the accepted ones.
         outcomes: One outcome per request of the instance.
-        executions: Executions of the tasks of the accepted requests.
-        transfers: Transmissions of the data of the accepted requests.
         status: Status reported by the solver.
         objective: Value of the objective, with its terms, if the solver reports one.
     """
 
+    schedule: Schedule
     outcomes: tuple[RequestOutcome, ...]
-    executions: tuple[TaskExecution, ...]
-    transfers: tuple[Transfer, ...]
     status: SolveStatus
     objective: ObjectiveValue | None = None
+
+    def __post_init__(self) -> None:
+        ids = [o.request_id for o in self.outcomes]
+        if len(set(ids)) != len(ids):
+            raise InstanceError("a request has more than one outcome")
+        accepted = frozenset(self.accepted_ids)
+        if self.schedule.request_ids != accepted:
+            raise InstanceError(
+                "the calendar must hold exactly the accepted requests: "
+                f"calendar {sorted(self.schedule.request_ids)}, "
+                f"accepted {sorted(accepted)}"
+            )
 
     def outcome(self, request_id: str) -> RequestOutcome:
         """Return the outcome of the request with identifier ``request_id``."""
