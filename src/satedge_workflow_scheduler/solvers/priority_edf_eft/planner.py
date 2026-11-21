@@ -100,15 +100,18 @@ class RequestPlanner:
             request.release if not_before is None else max(request.release, not_before)
         )
 
-        for position in range(len(request.tasks)):
-            placed = self._placement.place(request, position, location, ready, limit)
+        for task_index in range(len(request.tasks)):
+            placed = self._placement.place(request, task_index, location, ready, limit)
             if placed is None:
                 return PlanFailure("no feasible placement before the limit", plmm=False)
-            self._reserve_route(tx, request.id, position, placed.input_route, transfers)
+            # the input of task k is data item k
+            self._reserve_route(
+                tx, request.id, task_index, placed.input_route, transfers
+            )
             tx.reserve(HpcKey(placed.satellite), TimeWindow(placed.start, placed.end))
             executions.append(
                 TaskExecution(
-                    request.id, position, placed.satellite, placed.start, placed.end
+                    request.id, task_index, placed.satellite, placed.start, placed.end
                 )
             )
             location = placed.satellite
@@ -143,15 +146,15 @@ class RequestPlanner:
         self,
         tx: Transaction,
         request_id: str,
-        position: int,
+        data_index: int,
         route: Route,
         transfers: list[Transfer],
     ) -> None:
-        """Reserve the arcs of ``route`` and record its transfers."""
+        """Reserve the arcs of ``route`` and record its transfers of data ``data_index``."""
         for hop in route.hops:
             tx.reserve(ArcKey(hop.source, hop.target), TimeWindow(hop.start, hop.end))
             transfers.append(
                 Transfer(
-                    request_id, position, hop.source, hop.target, hop.start, hop.end
+                    request_id, data_index, hop.source, hop.target, hop.start, hop.end
                 )
             )

@@ -21,7 +21,7 @@ def assert_valid(instance: ProblemInstance, solution: Solution) -> None:
     """Check the constraints of the model on a solution, failing with a message if violated."""
     network = instance.network
     requests = {r.id: r for r in instance.requests}
-    executions = {(e.request_id, e.position): e for e in solution.schedule.executions}
+    executions = {(e.request_id, e.task_index): e for e in solution.schedule.executions}
     transfers = list(solution.schedule.transfers)
 
     for outcome in solution.outcomes:
@@ -36,17 +36,17 @@ def assert_valid(instance: ProblemInstance, solution: Solution) -> None:
 
         # each task runs inside an HPC window, after its input has arrived
         previous_ready = request.release
-        for position in range(len(request.tasks)):
-            e = executions[(request.id, position)]
+        for task_index in range(len(request.tasks)):
+            e = executions[(request.id, task_index)]
             satellite = network.satellite(e.satellite)
             assert any(
                 w.start <= e.start + EPS and e.end <= w.end + EPS
                 for w in satellite.hpc_windows
-            ), f"task {request.id}/{position} outside HPC windows"
+            ), f"task {request.id}/{task_index} outside HPC windows"
             assert e.start >= previous_ready - EPS, (
                 "task starts before its input arrives"
             )
-            assert e.end - e.start >= request.hpc_duration(position, satellite) - EPS
+            assert e.end - e.start >= request.hpc_duration(task_index, satellite) - EPS
             previous_ready = e.end
 
     # no overlap on any HPC

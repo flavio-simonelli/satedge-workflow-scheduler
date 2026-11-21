@@ -22,7 +22,7 @@ class PlmmOccupancyInterval:
 
     Attributes:
         request_id: Identifier of the request the data belongs to.
-        position: Index of the data item: 0 for the raw data, ``k`` for the output of task
+        data_index: Index of the data item: 0 for the raw data, ``k`` for the output of task
             ``k - 1``.
         size: Size in Gb of the data item.
         start: Start of the occupancy in seconds.
@@ -30,7 +30,7 @@ class PlmmOccupancyInterval:
     """
 
     request_id: str
-    position: int
+    data_index: int
     size: float
     start: float
     end: float
@@ -56,11 +56,11 @@ def plmm_intervals(
     """
     executions_by_request: dict[str, dict[int, TaskExecution]] = defaultdict(dict)
     for execution in executions:
-        executions_by_request[execution.request_id][execution.position] = execution
+        executions_by_request[execution.request_id][execution.task_index] = execution
 
     transfers_by_item: dict[tuple[str, int], list[Transfer]] = defaultdict(list)
     for transfer in transfers:
-        transfers_by_item[(transfer.request_id, transfer.position)].append(transfer)
+        transfers_by_item[(transfer.request_id, transfer.data_index)].append(transfer)
 
     network = instance.network
     result: dict[NodeId, list[PlmmOccupancyInterval]] = defaultdict(list)
@@ -70,33 +70,34 @@ def plmm_intervals(
         if not tasks_done:
             continue
 
-        for position in range(len(request.tasks) + 1):
-            size = request.data_sizes[position]
-            node, start = _creation(request, position, tasks_done, network)
+        for data_index in range(len(request.tasks) + 1):
+            size = request.data_sizes[data_index]
+            node, start = _creation(request, data_index, tasks_done, network)
             chain = sorted(
-                transfers_by_item.get((request.id, position), []),
+                transfers_by_item.get((request.id, data_index), []),
                 key=lambda t: t.start,
             )
             for hop in chain:
-                _add(result, node, request.id, position, size, start, hop.end)
+                _add(result, node, request.id, data_index, size, start, hop.end)
                 arc = network.arcs[network.arc_index[(hop.source, hop.target)]]
                 node = hop.target
                 start = hop.start + arc.latency
 
-            if position < len(request.tasks):
-                if node != tasks_done[position].satellite:
+            # data item k is the input of task k; the last one is the final output
+            if data_index < len(request.tasks):
+                if node != tasks_done[data_index].satellite:
                     raise SolverError(
-                        f"request {request.id}: data {position} does not reach "
-                        f"the satellite of task {position} ({node!r} instead)"
+                        f"request {request.id}: data {data_index} does not reach "
+                        f"the satellite of task {data_index} ({node!r} instead)"
                     )
                 _add(
                     result,
                     node,
                     request.id,
-                    position,
+                    data_index,
                     size,
                     start,
-                    tasks_done[position].end,
+                    tasks_done[data_index].end,
                 )
 
     return dict(result)
@@ -104,16 +105,16 @@ def plmm_intervals(
 
 def _creation(
     request: Request,
-    position: int,
+    data_index: int,
     tasks_done: dict[int, TaskExecution],
     network: Network,
 ) -> tuple[NodeId, float]:
-    """Node and instant at which data ``position`` is created in the PLMM."""
-    if position == 0:
+    """Node and instant at which data ``data_index`` is created in the PLMM."""
+    if data_index == 0:
         return request.origin, request.release
-    producer = tasks_done[position - 1]
+    producer = tasks_done[data_index - 1]
     satellite = network.satellite(producer.satellite)
-    size = request.data_sizes[position]
+    size = request.data_sizes[data_index]
     return producer.satellite, producer.end - satellite.hpc_io_time(size)
 
 
@@ -121,14 +122,14 @@ def _add(
     result: dict[NodeId, list[PlmmOccupancyInterval]],
     node: NodeId,
     request_id: str,
-    position: int,
+    data_index: int,
     size: float,
     start: float,
     end: float,
 ) -> None:
     if size == 0 or end <= start + TIME_TOLERANCE:
         return
-    result[node].append(PlmmOccupancyInterval(request_id, position, size, start, end))
+    result[node].append(PlmmOccupancyInterval(request_id, data_index, size, start, end))
 
 
 @dataclass(frozen=True, slots=True)

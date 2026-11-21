@@ -89,16 +89,16 @@ class Request:
         """Sizes in Gb of the data of the request: raw input, intermediate data, final output."""
         return (self.raw_size, *(task.output_size for task in self.tasks))
 
-    def hpc_duration(self, position: int, satellite: Satellite) -> float:
-        """Time in seconds for which task ``position`` occupies the HPC of ``satellite``.
+    def hpc_duration(self, task_index: int, satellite: Satellite) -> float:
+        """Time in seconds for which task ``task_index`` occupies the HPC of ``satellite``.
 
         It is the read time of the input from the PLMM, the execution time and the write
         time of the output into the PLMM: ``w_a + L_i + w_b``. The write takes the final
         part of the task.
         """
-        task = self.tasks[position]
+        task = self.tasks[task_index]
         return (
-            satellite.hpc_io_time(self.data_sizes[position])
+            satellite.hpc_io_time(self.data_sizes[task_index])
             + task.execution_time
             + satellite.hpc_io_time(task.output_size)
         )

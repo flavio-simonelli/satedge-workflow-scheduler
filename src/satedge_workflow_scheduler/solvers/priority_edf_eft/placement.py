@@ -70,12 +70,12 @@ class EftPlacement:
     def place(
         self,
         request: Request,
-        position: int,
+        task_index: int,
         location: NodeId,
         ready: float,
         limit: float,
     ) -> TaskPlacement | None:
-        """Best placement of task ``position`` of ``request``, whose input is at ``location``.
+        """Best placement of task ``task_index`` of ``request``, whose input is at ``location``.
 
         The input is available at ``location`` from ``ready``. On each satellite the task
         occupies the HPC for :meth:`Request.hpc_duration`, which depends on its HPC rate.
@@ -83,14 +83,14 @@ class EftPlacement:
         first is chosen. Ties go to the satellite reached with fewer hops, then to the one
         that comes first in the network.
         """
-        size = request.data_sizes[position]
+        size = request.data_sizes[task_index]
         routes = self._router.routes_from(location, ready, size, limit, to_ground=False)
         best: tuple[tuple[float, int, int], TaskPlacement] | None = None
         for index, satellite in enumerate(self._network.satellites):
             route = routes.get(satellite.id)
             if route is None:
                 continue
-            duration = request.hpc_duration(position, satellite)
+            duration = request.hpc_duration(task_index, satellite)
             start = self.earliest_slot(satellite, route.arrival, duration)
             if start is None:
                 continue

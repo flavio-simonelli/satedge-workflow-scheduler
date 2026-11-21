@@ -82,15 +82,15 @@ class ProblemInstance:
                 raise InstanceError(
                     f"committed calendar refers to unknown request {request_id!r}"
                 )
-            positions = sorted(
-                e.position
+            task_indices = sorted(
+                e.task_index
                 for e in self.committed.executions
                 if e.request_id == request_id
             )
-            if positions != list(range(len(request.tasks))):
+            if task_indices != list(range(len(request.tasks))):
                 raise InstanceError(
                     f"committed request {request_id}: needs one execution per task, "
-                    f"got positions {positions}"
+                    f"got tasks {task_indices}"
                 )
 
     def release_of(self, satellite: NodeId) -> float:

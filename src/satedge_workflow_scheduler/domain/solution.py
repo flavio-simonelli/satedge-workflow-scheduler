@@ -23,14 +23,14 @@ class TaskExecution:
 
     Attributes:
         request_id: Identifier of the request.
-        position: Index of the task in the pipeline of the request.
+        task_index: Index of the task in the pipeline of the request.
         satellite: Satellite that runs the task.
         start: Start instant in seconds (>= 0).
         end: End instant in seconds (> start).
     """
 
     request_id: str
-    position: int
+    task_index: int
     satellite: NodeId
     start: float
     end: float
@@ -38,7 +38,7 @@ class TaskExecution:
     def __post_init__(self) -> None:
         if self.start < 0 or self.end <= self.start:
             raise InstanceError(
-                f"execution of {self.request_id}, task {self.position}: "
+                f"execution of {self.request_id}, task {self.task_index}: "
                 f"invalid interval [{self.start}, {self.end}]"
             )
 
@@ -49,7 +49,7 @@ class Transfer:
 
     Attributes:
         request_id: Identifier of the request.
-        position: Index of the data item: 0 for the raw data, ``k`` for the output of task
+        data_index: Index of the data item: 0 for the raw data, ``k`` for the output of task
             ``k - 1``.
         source: Tail node of the arc.
         target: Head node of the arc.
@@ -58,7 +58,7 @@ class Transfer:
     """
 
     request_id: str
-    position: int
+    data_index: int
     source: NodeId
     target: NodeId
     start: float
@@ -67,7 +67,7 @@ class Transfer:
     def __post_init__(self) -> None:
         if self.start < 0 or self.end <= self.start:
             raise InstanceError(
-                f"transfer of {self.request_id}, data {self.position} on "
+                f"transfer of {self.request_id}, data {self.data_index} on "
                 f"{self.source}->{self.target}: invalid interval [{self.start}, {self.end}]"
             )
 
@@ -90,10 +90,12 @@ class Schedule:
     transfers: tuple[Transfer, ...] = ()
 
     def __post_init__(self) -> None:
-        tasks = [(e.request_id, e.position) for e in self.executions]
+        tasks = [(e.request_id, e.task_index) for e in self.executions]
         if len(set(tasks)) != len(tasks):
             raise InstanceError("a task of a request is executed more than once")
-        hops = [(t.request_id, t.position, t.source, t.target) for t in self.transfers]
+        hops = [
+            (t.request_id, t.data_index, t.source, t.target) for t in self.transfers
+        ]
         if len(set(hops)) != len(hops):
             raise InstanceError(
                 "a data item of a request uses the same arc more than once"
