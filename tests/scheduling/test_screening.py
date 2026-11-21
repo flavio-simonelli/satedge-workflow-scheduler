@@ -2,36 +2,43 @@ from __future__ import annotations
 
 from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
-from satedge_workflow_scheduler.domain.network import Network, Plane
+from satedge_workflow_scheduler.domain.network import (
+    AlwaysAvailable,
+    Arc,
+    Network,
+    Plane,
+)
 from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
 from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
 from satedge_workflow_scheduler.domain.solution import Schedule, TaskExecution
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
 from satedge_workflow_scheduler.scheduling.screening import (
-    executable_satellites,
     unrealizable_reason,
     unrealizable_requests,
 )
 
-# Every satellite has a 1 Gbps HPC. Raw 2 Gb, one task of 10 s with a 3 Gb output:
-# the task occupies the HPC for 2 + 10 + 3 = 15 s.
+# S1 <-> S2 and S2 -> G always available, 1 Gbps, latency 1 s. Every HPC at 1 Gbps.
+# Raw 2 Gb on S1, one task of 10 s with a 3 Gb output: the task lasts 2 + 10 + 3 = 15 s,
+# the raw takes 3 s on an arc and the output 4 s.
+# Released at 0, the best delivery is 22: raw to S2 by 3, task on S2 in [3, 18], output
+# to G by 22 (on S1 the task would end at 15, but the output needs two hops: 23).
 
 
-def _network(s1_window: float = 20.0, s2_window: float = 20.0) -> Network:
-    s1 = Satellite(
-        "S1", 10.0, hpc_rate=1.0, hpc_windows=WindowSet((TimeWindow(0.0, s1_window),))
-    )
-    s2 = Satellite(
-        "S2", 10.0, hpc_rate=1.0, hpc_windows=WindowSet((TimeWindow(0.0, s2_window),))
-    )
-    return Network(
-        planes=(
-            Plane(id=1, satellites=(s1,), com="S1"),
-            Plane(id=2, satellites=(s2,), com="S2"),
-        ),
+def _instance(*requests: Request, window: float = 200.0) -> ProblemInstance:
+    satellites = [
+        Satellite(sid, 10.0, 1.0, WindowSet((TimeWindow(0.0, window),)))
+        for sid in ("S1", "S2")
+    ]
+    network = Network(
+        planes=(Plane(1, (satellites[0],), "S1"), Plane(2, (satellites[1],), "S2")),
         ground_station=GroundStation("G"),
-        arcs=(),
+        arcs=(
+            Arc("S1", "S2", 1.0, 1.0, AlwaysAvailable()),
+            Arc("S2", "S1", 1.0, 1.0, AlwaysAvailable()),
+            Arc("S2", "G", 1.0, 1.0, AlwaysAvailable()),
+        ),
     )
+    return ProblemInstance(network=network, requests=requests, horizon=300.0)
 
 
 def _request(rid: str = "r", release: float = 0.0, deadline: float = 100.0) -> Request:
@@ -46,38 +53,21 @@ def _request(rid: str = "r", release: float = 0.0, deadline: float = 100.0) -> R
     )
 
 
-def test_a_task_runs_only_where_a_window_is_long_enough() -> None:
-    # the 15 s task fits in the 20 s window of S2, not in the 14 s window of S1
-    network = _network(s1_window=14.0, s2_window=20.0)
-    assert executable_satellites(_request(), 0, network) == ("S2",)
+def test_a_feasible_request_has_no_reason() -> None:
+    assert unrealizable_reason(_request(), _instance(_request()), limit=22.0) is None
 
 
-def test_a_window_exactly_as_long_as_the_task_is_enough() -> None:
-    network = _network(s1_window=15.0, s2_window=15.0)
-    assert executable_satellites(_request(), 0, network) == ("S1", "S2")
-
-
-def test_a_task_longer_than_every_window_makes_the_request_unrealizable() -> None:
-    network = _network(s1_window=10.0, s2_window=10.0)
-    reason = unrealizable_reason(_request(), network, limit=100.0)
+def test_a_task_longer_than_every_window_fits_nowhere() -> None:
+    instance = _instance(_request(), window=10.0)
+    reason = unrealizable_reason(_request(), instance, limit=100.0)
     assert reason == "task 0 fits in no computing window"
 
 
-def test_the_pipeline_must_end_by_the_limit() -> None:
-    # release 80 + 15 s of HPC = 95: it ends by 95, not by 94
-    network = _network()
-    assert unrealizable_reason(_request(release=80.0), network, limit=95.0) is None
-    reason = unrealizable_reason(_request(release=80.0), network, limit=94.0)
-    assert reason is not None and "95" in reason
-
-
-def _instance(*requests: Request, committed: Schedule | None = None) -> ProblemInstance:
-    return ProblemInstance(
-        network=_network(),
-        requests=requests,
-        horizon=200.0,
-        committed=committed or Schedule(),
-    )
+def test_the_delivery_to_the_ground_counts() -> None:
+    # The pipeline alone ends at 15, before the limit of 21, but its output cannot
+    # reach the ground before 22.
+    reason = unrealizable_reason(_request(), _instance(_request()), limit=21.0)
+    assert reason == "task 0 can run on no satellite in time to deliver by 21.0 s"
 
 
 def test_hard_mode_screens_against_the_deadline() -> None:
@@ -88,13 +78,18 @@ def test_hard_mode_screens_against_the_deadline() -> None:
 
 
 def test_soft_mode_screens_against_the_horizon() -> None:
-    # the deadline of 100 is missed, but the horizon of 200 is not
+    # the deadline of 100 is missed, but the horizon of 300 is not
     late = _request("late", release=90.0, deadline=100.0)
     assert unrealizable_requests(_instance(late), DeadlineMode.SOFT) == {}
 
 
 def test_committed_requests_are_not_screened() -> None:
     late = _request("late", release=90.0, deadline=100.0)
-    committed = Schedule(executions=(TaskExecution("late", 0, "S2", 0.0, 15.0),))
-    instance = _instance(late, committed=committed)
-    assert unrealizable_requests(instance, DeadlineMode.HARD) == {}
+    instance = _instance(late)
+    committed = ProblemInstance(
+        network=instance.network,
+        requests=(late,),
+        horizon=300.0,
+        committed=Schedule(executions=(TaskExecution("late", 0, "S2", 93.0, 108.0),)),
+    )
+    assert unrealizable_requests(committed, DeadlineMode.HARD) == {}
