@@ -83,7 +83,12 @@ def _instance(
         ground_station=GroundStation(id="G"),
         arcs=(_arc("S1", "S2"), _arc("S2", "G")),
     )
-    return ProblemInstance(network=network, requests=requests, horizon=horizon)
+    return ProblemInstance(
+        network=network,
+        requests=requests,
+        horizon=horizon,
+        plan_release={s: 0.0 for s in network.satellite_ids},
+    )
 
 
 def _solve(instance: ProblemInstance, mode: DeadlineMode) -> Solution:

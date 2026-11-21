@@ -75,7 +75,10 @@ def _instance(
         network=network,
         requests=requests or (_request(),),
         horizon=300.0,
-        plan_release=plan_release or {},
+        plan_release={
+            **{s: 0.0 for s in network.satellite_ids},
+            **(plan_release or {}),
+        },
         committed=committed or Schedule(),
     )
 

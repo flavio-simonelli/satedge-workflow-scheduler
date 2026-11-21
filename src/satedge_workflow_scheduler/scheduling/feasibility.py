@@ -495,6 +495,8 @@ def _online(s: _Schedule) -> Iterator[Violation]:
 def _after_plan(
     s: _Schedule, request_id: str, what: str, node: NodeId, start: float
 ) -> Iterator[Violation]:
+    if not s.instance.network.is_satellite(node):
+        return  # the plan constrains the satellites only, not the ground station
     release = s.instance.release_of(node)
     if start < release - s.eps:
         reached = (

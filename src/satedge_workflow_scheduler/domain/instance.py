@@ -27,8 +27,8 @@ class ProblemInstance:
             the request deadlines.
         plan_release: Plan release ``b^plan_s`` of each satellite, in seconds: the instant at
             which the new plan reaches it, before which no new task or transmission can start
-            there. ``math.inf`` means that the plan does not reach the satellite. A satellite
-            not listed has release 0.
+            there. ``math.inf`` means that the plan does not reach the satellite. Every
+            satellite of the network must be listed.
         committed: Committed calendar, from a previous plan and fixed. The requests that
             appear in it are the committed ones, and each has one execution per task.
         name: Optional name of the instance.
@@ -37,9 +37,7 @@ class ProblemInstance:
     network: Network
     requests: tuple[Request, ...]
     horizon: float
-    plan_release: Mapping[NodeId, float] = field(
-        default_factory=lambda: MappingProxyType({})
-    )
+    plan_release: Mapping[NodeId, float]
     committed: Schedule = field(default_factory=Schedule)
     name: str = ""
 
@@ -71,6 +69,9 @@ class ProblemInstance:
                 raise InstanceError(
                     f"plan release of {node!r} must be >= 0 or inf, got {release}"
                 )
+        missing = [s for s in self.network.satellite_ids if s not in self.plan_release]
+        if missing:
+            raise InstanceError(f"plan release missing for satellites {missing}")
 
         self._check_committed()
 
@@ -94,8 +95,8 @@ class ProblemInstance:
                 )
 
     def release_of(self, satellite: NodeId) -> float:
-        """Plan release of ``satellite``: 0 if not listed."""
-        return self.plan_release.get(satellite, 0.0)
+        """Plan release of ``satellite``; every satellite is listed (checked at construction)."""
+        return self.plan_release[satellite]
 
     def is_committed(self, request_id: str) -> bool:
         """Whether the request appears in the committed calendar."""

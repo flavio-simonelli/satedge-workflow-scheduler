@@ -57,7 +57,12 @@ def _instance(requests: tuple[Request, ...], horizon: float = 100.0) -> ProblemI
             ),
         ),
     )
-    return ProblemInstance(network=network, requests=requests, horizon=horizon)
+    return ProblemInstance(
+        network=network,
+        requests=requests,
+        horizon=horizon,
+        plan_release={s: 0.0 for s in network.satellite_ids},
+    )
 
 
 def test_tardiness_of_accepted_late_request() -> None:

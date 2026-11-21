@@ -38,7 +38,12 @@ def _instance(*requests: Request, window: float = 200.0) -> ProblemInstance:
             Arc("S2", "G", 1.0, 1.0, AlwaysAvailable()),
         ),
     )
-    return ProblemInstance(network=network, requests=requests, horizon=300.0)
+    return ProblemInstance(
+        network=network,
+        requests=requests,
+        horizon=300.0,
+        plan_release={s: 0.0 for s in network.satellite_ids},
+    )
 
 
 def _request(rid: str = "r", release: float = 0.0, deadline: float = 100.0) -> Request:
@@ -90,6 +95,7 @@ def test_committed_requests_are_not_screened() -> None:
         network=instance.network,
         requests=(late,),
         horizon=300.0,
+        plan_release=instance.plan_release,
         committed=Schedule(executions=(TaskExecution("late", 0, "S2", 93.0, 108.0),)),
     )
     assert unrealizable_requests(committed, DeadlineMode.HARD) == {}

@@ -72,7 +72,12 @@ def _instance() -> ProblemInstance:
         raw_size=2.0,
         tasks=(Task(execution_time=10.0, output_size=3.0),),
     )
-    return ProblemInstance(network=network, requests=(request,), horizon=500.0)
+    return ProblemInstance(
+        network=network,
+        requests=(request,),
+        horizon=500.0,
+        plan_release={s: 0.0 for s in network.satellite_ids},
+    )
 
 
 def test_direct_route_occupies_origin_raw_and_task_satellite_output() -> None:

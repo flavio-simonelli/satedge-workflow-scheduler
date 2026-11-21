@@ -47,7 +47,11 @@ def _instance(
         network=network,
         requests=(_request("c"), _request("n")),
         horizon=500.0,
-        plan_release=plan_release or {},
+        plan_release=(
+            {s: 0.0 for s in network.satellite_ids}
+            if plan_release is None
+            else plan_release
+        ),
         committed=committed,
     )
 
@@ -80,6 +84,11 @@ def test_plan_release_cannot_be_changed_through_the_original_dict() -> None:
 def test_plan_release_must_be_non_negative(release: float) -> None:
     with pytest.raises(InstanceError, match="plan release"):
         _instance(plan_release={"S1": release})
+
+
+def test_every_satellite_must_have_a_plan_release() -> None:
+    with pytest.raises(InstanceError, match="missing"):
+        _instance(plan_release={})
 
 
 def test_plan_release_only_for_satellites() -> None:

@@ -52,7 +52,12 @@ def _instance(
         raw_size=2.0,
         tasks=(Task(execution_time=10.0, output_size=1.0),),
     )
-    return ProblemInstance(network=network, requests=(request,), horizon=HORIZON)
+    return ProblemInstance(
+        network=network,
+        requests=(request,),
+        horizon=HORIZON,
+        plan_release={s: 0.0 for s in network.satellite_ids},
+    )
 
 
 def _arc(windows: WindowedAvailability | AlwaysAvailable) -> Arc:

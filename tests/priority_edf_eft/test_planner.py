@@ -72,7 +72,12 @@ def _setup(
         raw_size=2.0,
         tasks=(Task(execution_time=10.0, output_size=3.0),),
     )
-    instance = ProblemInstance(network=network, requests=(request,), horizon=1000.0)
+    instance = ProblemInstance(
+        network=network,
+        requests=(request,),
+        horizon=1000.0,
+        plan_release={s: 0.0 for s in network.satellite_ids},
+    )
     ledger = ResourceLedger(network)
     router = EarliestArrivalRouter(network, ledger, EPS)
     placement = EftPlacement(network, ledger, router, EPS)
