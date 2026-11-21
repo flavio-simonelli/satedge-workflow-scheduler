@@ -46,7 +46,7 @@ def assert_valid(instance: ProblemInstance, solution: Solution) -> None:
             assert e.start >= previous_ready - EPS, (
                 "task starts before its input arrives"
             )
-            assert e.end - e.start >= request.tasks[position].duration - EPS
+            assert e.end - e.start >= request.hpc_duration(position, satellite) - EPS
             previous_ready = e.end
 
     # no overlap on any HPC

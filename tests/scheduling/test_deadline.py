@@ -12,7 +12,7 @@ def _request(deadline: float) -> Request:
         release=0.0,
         deadline=deadline,
         raw_size=1.0,
-        tasks=(Task(duration=10.0, output_size=1.0),),
+        tasks=(Task(execution_time=10.0, output_size=1.0),),
     )
 
 

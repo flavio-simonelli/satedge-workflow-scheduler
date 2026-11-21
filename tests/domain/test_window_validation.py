@@ -13,7 +13,7 @@ def test_satellite_rejects_overlapping_hpc_windows_as_instance_error() -> None:
         Satellite(
             id="S1",
             plmm_capacity=10.0,
-            hpc_write_rate=1.0,
+            hpc_rate=1.0,
             hpc_windows=(TimeWindow(0.0, 6.0), TimeWindow(5.0, 9.0)),
         )
 

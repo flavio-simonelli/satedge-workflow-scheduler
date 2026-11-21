@@ -34,7 +34,7 @@ def _sat(sid: str) -> Satellite:
     return Satellite(
         id=sid,
         plmm_capacity=10.0,
-        hpc_write_rate=1.0,
+        hpc_rate=1.0,
         hpc_windows=(TimeWindow(0.0, 1000.0),),
     )
 
@@ -70,7 +70,7 @@ def _instance() -> ProblemInstance:
         release=0.0,
         deadline=500.0,
         raw_size=2.0,
-        tasks=(Task(duration=10.0, output_size=3.0),),
+        tasks=(Task(execution_time=10.0, output_size=3.0),),
     )
     return ProblemInstance(network=network, requests=(request,), horizon=500.0)
 

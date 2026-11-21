@@ -10,6 +10,7 @@ from satedge_workflow_scheduler.domain.network import (
     Plane,
 )
 from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
+from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
 from satedge_workflow_scheduler.solvers.priority_edf_eft.ledger import (
     HpcKey,
     ResourceLedger,
@@ -23,8 +24,19 @@ EPS = 1e-9
 
 
 def _sat(sid: str, windows: tuple[TimeWindow, ...]) -> Satellite:
-    return Satellite(
-        id=sid, plmm_capacity=10.0, hpc_write_rate=1.0, hpc_windows=windows
+    return Satellite(id=sid, plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=windows)
+
+
+def _request(raw: float) -> Request:
+    # read raw/1 s, run 10 s, write 1 s on any satellite (HPC rate 1 Gbps)
+    return Request(
+        id="r",
+        priority=Priority.URGENT,
+        origin="S1",
+        release=0.0,
+        deadline=500.0,
+        raw_size=raw,
+        tasks=(Task(execution_time=10.0, output_size=1.0),),
     )
 
 
@@ -94,20 +106,20 @@ def test_earliest_slot_is_none_when_nothing_fits() -> None:
 
 
 def test_task_goes_where_it_ends_first_even_if_its_input_arrives_later() -> None:
-    # S1 can run only in [50, 100): the task would end at 60.
-    # S2 receives 2 Gb after 3 s and runs at once: it ends at 13.
+    # The task lasts 2 + 10 + 1 = 13 s. S1 can run only in [50, 100): it would end at 63.
+    # S2 receives 2 Gb after 3 s and runs at once: it ends at 16.
     _, _, placement = _setup((TimeWindow(50.0, 100.0),))
-    chosen = placement.place("S1", ready=0.0, size=2.0, duration=10.0, limit=200.0)
+    chosen = placement.place(_request(2.0), 0, "S1", ready=0.0, limit=200.0)
     assert chosen is not None
     assert chosen.satellite == "S2"
-    assert chosen.end == pytest.approx(13.0)
+    assert chosen.end == pytest.approx(16.0)
 
 
 def test_ties_go_to_the_route_with_fewer_hops() -> None:
-    # size 0: S2 receives the input after the latency (1 s), and S1 can start at 1 s too.
-    # Both end at 11; S1 is reached with no hop, so it wins.
-    _, _, placement = _setup((TimeWindow(1.0, 1000.0),))
-    chosen = placement.place("S1", ready=0.0, size=0.0, duration=10.0, limit=200.0)
+    # S2 receives the 2 Gb input at 3 (2 s + 1 s latency), and S1 can start at 3 too.
+    # Both end at 16; S1 is reached with no hop, so it wins.
+    _, _, placement = _setup((TimeWindow(3.0, 1000.0),))
+    chosen = placement.place(_request(2.0), 0, "S1", ready=0.0, limit=200.0)
     assert chosen is not None
     assert chosen.satellite == "S1"
     assert chosen.input_route.hops == ()
@@ -115,4 +127,4 @@ def test_ties_go_to_the_route_with_fewer_hops() -> None:
 
 def test_placement_is_none_when_every_end_exceeds_the_limit() -> None:
     _, _, placement = _setup((TimeWindow(50.0, 100.0),))
-    assert placement.place("S1", ready=0.0, size=2.0, duration=10.0, limit=12.0) is None
+    assert placement.place(_request(2.0), 0, "S1", ready=0.0, limit=15.0) is None

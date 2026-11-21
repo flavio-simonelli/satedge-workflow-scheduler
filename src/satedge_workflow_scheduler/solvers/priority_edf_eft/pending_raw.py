@@ -30,7 +30,7 @@ def earliest_raw_departure(
     """
     network = instance.network
     origin = network.satellite(request.origin)
-    first_duration = request.tasks[0].duration
+    first_duration = request.hpc_duration(0, origin)
     candidates: list[float] = []
 
     for window in origin.hpc_windows:

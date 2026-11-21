@@ -114,7 +114,7 @@ def _creation(
     producer = tasks_done[position - 1]
     satellite = network.satellite(producer.satellite)
     size = request.data_sizes[position]
-    return producer.satellite, producer.end - satellite.write_time(size)
+    return producer.satellite, producer.end - satellite.hpc_io_time(size)
 
 
 def _add(

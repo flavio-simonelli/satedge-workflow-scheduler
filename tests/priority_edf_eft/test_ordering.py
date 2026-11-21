@@ -18,7 +18,7 @@ def _req(
         release=release,
         deadline=deadline,
         raw_size=1.0,
-        tasks=(Task(duration=10.0, output_size=1.0),),
+        tasks=(Task(execution_time=10.0, output_size=1.0),),
     )
 
 

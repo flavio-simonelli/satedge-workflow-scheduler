@@ -46,13 +46,11 @@ def _setup(
     s2_capacity: float = 10.0,
     limit: float = 500.0,
 ) -> tuple[RequestPlanner, ResourceLedger, Request, ProblemInstance]:
-    s1 = Satellite(
-        id="S1", plmm_capacity=10.0, hpc_write_rate=1.0, hpc_windows=s1_windows
-    )
+    s1 = Satellite(id="S1", plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=s1_windows)
     s2 = Satellite(
         id="S2",
         plmm_capacity=s2_capacity,
-        hpc_write_rate=1.0,
+        hpc_rate=1.0,
         hpc_windows=(TimeWindow(0.0, 1000.0),),
     )
     network = Network(
@@ -70,7 +68,7 @@ def _setup(
         release=0.0,
         deadline=limit,
         raw_size=2.0,
-        tasks=(Task(duration=10.0, output_size=3.0),),
+        tasks=(Task(execution_time=10.0, output_size=3.0),),
     )
     instance = ProblemInstance(network=network, requests=(request,), horizon=1000.0)
     ledger = ResourceLedger(network)
@@ -82,7 +80,8 @@ def _setup(
 
 def test_planned_request_has_its_executions_transfers_and_delivery() -> None:
     # S1 has no HPC window, so the task runs on S2: the raw arrives at 3 (2 s + 1 s),
-    # the task runs 3..13, and the 3 Gb output leaves at 13 and arrives at 17.
+    # the task runs 3..18 (read 2 s, run 10 s, write 3 s), and the 3 Gb output leaves at
+    # 18 and arrives at 22.
     planner, ledger, request, _ = _setup(s1_windows=())
     with ledger.transaction() as tx:
         result = planner.plan(
@@ -91,12 +90,12 @@ def test_planned_request_has_its_executions_transfers_and_delivery() -> None:
         tx.commit()
 
     assert isinstance(result, RequestPlan)
-    assert result.executions == (TaskExecution("r", 0, "S2", 3.0, 13.0),)
+    assert result.executions == (TaskExecution("r", 0, "S2", 3.0, 18.0),)
     assert result.transfers == (
         Transfer("r", 0, "S1", "S2", 0.0, 2.0),
-        Transfer("r", 1, "S2", "G", 13.0, 16.0),
+        Transfer("r", 1, "S2", "G", 18.0, 21.0),
     )
-    assert result.delivery_time == pytest.approx(17.0)
+    assert result.delivery_time == pytest.approx(22.0)
 
 
 def test_committed_request_reserves_the_hpc_and_the_plmm() -> None:
@@ -105,7 +104,7 @@ def test_committed_request_reserves_the_hpc_and_the_plmm() -> None:
         planner.plan(request, limit=500.0, not_before=None, tx=tx, extra_plmm={})
         tx.commit()
 
-    assert ledger.timeline(HpcKey("S2")).windows == (TimeWindow(3.0, 13.0),)
+    assert ledger.timeline(HpcKey("S2")).windows == (TimeWindow(3.0, 18.0),)
     assert len(ledger.plmm("S2")) == 2
 
 
@@ -117,10 +116,11 @@ def test_no_placement_before_the_limit_is_a_failure_not_caused_by_plmm() -> None
 
 
 def test_delivery_after_the_limit_is_a_failure() -> None:
+    # the task ends at 18, before the limit, but the output reaches G only at 22
     planner, ledger, request, _ = _setup(s1_windows=())
     with ledger.transaction() as tx:
         result = planner.plan(
-            request, limit=15.0, not_before=None, tx=tx, extra_plmm={}
+            request, limit=20.0, not_before=None, tx=tx, extra_plmm={}
         )
     assert result == PlanFailure(
         "no delivery to the ground station before the limit", plmm=False

@@ -51,7 +51,7 @@ def _request(
         release=release,
         deadline=deadline,
         raw_size=raw,
-        tasks=(Task(duration=duration, output_size=out),),
+        tasks=(Task(execution_time=duration, output_size=out),),
     )
 
 
@@ -64,10 +64,10 @@ def _instance(
     s1_capacity: float = 10.0,
 ) -> ProblemInstance:
     s1 = Satellite(
-        id="S1", plmm_capacity=s1_capacity, hpc_write_rate=1.0, hpc_windows=s1_windows
+        id="S1", plmm_capacity=s1_capacity, hpc_rate=1.0, hpc_windows=s1_windows
     )
     s2 = Satellite(
-        id="S2", plmm_capacity=s2_capacity, hpc_write_rate=1.0, hpc_windows=s2_windows
+        id="S2", plmm_capacity=s2_capacity, hpc_rate=1.0, hpc_windows=s2_windows
     )
     network = Network(
         planes=(
@@ -85,12 +85,13 @@ def _solve(instance: ProblemInstance, mode: DeadlineMode) -> Solution:
 
 
 def test_hard_mode_delivers_a_feasible_request(check_valid: Checker) -> None:
-    # raw arrives at S2 at 3, the task runs 3..13, the output arrives at G at 17
+    # raw arrives at S2 at 3, the task runs 3..18 (read 2 s, run 10 s, write 3 s),
+    # the output arrives at G at 22
     instance = _instance((_request("r", U, deadline=500.0),))
     solution = _solve(instance, DeadlineMode.HARD)
 
     assert solution.outcome("r").accepted
-    assert solution.outcome("r").delivery_time == pytest.approx(17.0)
+    assert solution.outcome("r").delivery_time == pytest.approx(22.0)
     assert solution.objective is not None
     assert solution.objective.primary == pytest.approx(0.0)
     check_valid(instance, solution)
@@ -121,14 +122,14 @@ def test_hard_mode_rejects_an_impossible_request_without_disturbing_the_others(
 def test_soft_mode_serves_a_late_request_and_charges_its_tardiness(
     check_valid: Checker,
 ) -> None:
-    # delivered at 17 against a deadline of 5: tardiness 12, non urgent weight 1
+    # delivered at 22 against a deadline of 5: tardiness 17, non urgent weight 1
     instance = _instance((_request("r", N, deadline=5.0),))
     solution = _solve(instance, DeadlineMode.SOFT)
 
     assert solution.outcome("r").accepted
     assert solution.objective is not None
-    assert solution.objective.primary == pytest.approx(12.0)
-    assert solution.objective.response == pytest.approx(17.0)
+    assert solution.objective.primary == pytest.approx(17.0)
+    assert solution.objective.response == pytest.approx(22.0)
     check_valid(instance, solution)
 
 
@@ -142,12 +143,12 @@ def test_soft_mode_fails_when_a_request_cannot_meet_the_horizon() -> None:
 def test_urgent_request_gets_the_hpc_before_a_non_urgent_one_with_an_earlier_deadline(
     check_valid: Checker,
 ) -> None:
-    # S2 has one window of 15 s: only one 10 s task fits in it.
+    # S2 has one window of 20 s: the raw arrives at 3, so only one 15 s task fits in it.
     urgent = _request("u", U, deadline=500.0)
     non_urgent = _request("n", N, deadline=100.0)
     instance = _instance(
         (non_urgent, urgent),
-        s2_windows=(TimeWindow(0.0, 15.0),),
+        s2_windows=(TimeWindow(0.0, 20.0),),
     )
     solution = _solve(instance, DeadlineMode.HARD)
 
@@ -170,7 +171,7 @@ def _solver_with_retries(max_retries: int) -> PriorityEdfEftSolver:
 
 
 def test_soft_mode_retries_later_when_the_plmm_is_full(check_valid: Checker) -> None:
-    # S2 holds 5 Gb. The urgent request fills it between 3 and 16. The non urgent one can
+    # S2 holds 5 Gb. The urgent request fills it between 15 and 18. The non urgent one can
     # only be planned after its data is freed, so it needs a retry at a later instant.
     urgent = _request("u", U, deadline=500.0)
     non_urgent = _request("n", N, deadline=500.0)

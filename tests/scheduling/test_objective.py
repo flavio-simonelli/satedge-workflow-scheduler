@@ -33,7 +33,7 @@ def _request(rid: str, priority: Priority, deadline: float) -> Request:
         release=0.0,
         deadline=deadline,
         raw_size=1.0,
-        tasks=(Task(duration=10.0, output_size=1.0),),
+        tasks=(Task(execution_time=10.0, output_size=1.0),),
     )
 
 
@@ -41,7 +41,7 @@ def _instance(requests: tuple[Request, ...], horizon: float = 100.0) -> ProblemI
     sat = Satellite(
         id="S1",
         plmm_capacity=10.0,
-        hpc_write_rate=1.0,
+        hpc_rate=1.0,
         hpc_windows=(TimeWindow(0.0, 1000.0),),
     )
     network = Network(

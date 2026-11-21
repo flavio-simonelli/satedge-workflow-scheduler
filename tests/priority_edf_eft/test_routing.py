@@ -27,7 +27,7 @@ def _sat(sid: str) -> Satellite:
     return Satellite(
         id=sid,
         plmm_capacity=10.0,
-        hpc_write_rate=1.0,
+        hpc_rate=1.0,
         hpc_windows=(TimeWindow(0.0, 1000.0),),
     )
 

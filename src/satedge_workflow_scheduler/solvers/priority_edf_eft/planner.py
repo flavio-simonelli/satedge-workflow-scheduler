@@ -96,13 +96,12 @@ class RequestPlanner:
         transfers: list[Transfer] = []
 
         location = request.origin
-        size = request.raw_size
         ready = (
             request.release if not_before is None else max(request.release, not_before)
         )
 
-        for position, task in enumerate(request.tasks):
-            placed = self._placement.place(location, ready, size, task.duration, limit)
+        for position in range(len(request.tasks)):
+            placed = self._placement.place(request, position, location, ready, limit)
             if placed is None:
                 return PlanFailure("no feasible placement before the limit", plmm=False)
             self._reserve_route(tx, request.id, position, placed.input_route, transfers)
@@ -114,10 +113,9 @@ class RequestPlanner:
             )
             location = placed.satellite
             ready = placed.end
-            size = task.output_size
 
         route = self._router.routes_from(
-            location, ready, size, limit, to_ground=True
+            location, ready, request.output_size, limit, to_ground=True
         ).get(ground)
         if route is None:
             return PlanFailure(

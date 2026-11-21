@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from satedge_workflow_scheduler.common.errors import InstanceError
-from satedge_workflow_scheduler.domain.nodes import NodeId
+from satedge_workflow_scheduler.domain.nodes import NodeId, Satellite
 
 
 class Priority(StrEnum):
@@ -22,18 +22,20 @@ class Task:
     """A task of a pipeline.
 
     Attributes:
-        duration: Computing time on the HPC, in seconds, container start-up excluded (> 0).
+        execution_time: Execution time on the HPC, in seconds, the same on every satellite
+            (> 0). It excludes the container start-up and the time to read the input from the
+            PLMM and to write the output into it: see :meth:`Request.hpc_duration`.
         output_size: Size in Gb of the data produced by the task, which is the input of the
             next task or, for the last task, the final output (> 0).
     """
 
-    duration: float
+    execution_time: float
     output_size: float
 
     def __post_init__(self) -> None:
-        if not (math.isfinite(self.duration) and self.duration > 0):
+        if not (math.isfinite(self.execution_time) and self.execution_time > 0):
             raise InstanceError(
-                f"task duration must be finite and > 0, got {self.duration}"
+                f"task execution time must be finite and > 0, got {self.execution_time}"
             )
         if not (math.isfinite(self.output_size) and self.output_size > 0):
             raise InstanceError(
@@ -87,7 +89,16 @@ class Request:
         """Sizes in Gb of the data of the request: raw input, intermediate data, final output."""
         return (self.raw_size, *(task.output_size for task in self.tasks))
 
-    @property
-    def total_duration(self) -> float:
-        """Sum of the task durations, in seconds."""
-        return sum(task.duration for task in self.tasks)
+    def hpc_duration(self, position: int, satellite: Satellite) -> float:
+        """Time in seconds for which task ``position`` occupies the HPC of ``satellite``.
+
+        It is the read time of the input from the PLMM, the execution time and the write
+        time of the output into the PLMM: ``w_a + L_i + w_b``. The write takes the final
+        part of the task.
+        """
+        task = self.tasks[position]
+        return (
+            satellite.hpc_io_time(self.data_sizes[position])
+            + task.execution_time
+            + satellite.hpc_io_time(task.output_size)
+        )
