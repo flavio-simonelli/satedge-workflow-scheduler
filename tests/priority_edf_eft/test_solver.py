@@ -5,7 +5,7 @@ from collections.abc import Callable
 import pytest
 
 from satedge_workflow_scheduler.common.errors import InfeasibleModelError
-from satedge_workflow_scheduler.common.intervals import TimeWindow
+from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
@@ -64,10 +64,16 @@ def _instance(
     s1_capacity: float = 10.0,
 ) -> ProblemInstance:
     s1 = Satellite(
-        id="S1", plmm_capacity=s1_capacity, hpc_rate=1.0, hpc_windows=s1_windows
+        id="S1",
+        plmm_capacity=s1_capacity,
+        hpc_rate=1.0,
+        hpc_windows=WindowSet(s1_windows),
     )
     s2 = Satellite(
-        id="S2", plmm_capacity=s2_capacity, hpc_rate=1.0, hpc_windows=s2_windows
+        id="S2",
+        plmm_capacity=s2_capacity,
+        hpc_rate=1.0,
+        hpc_windows=WindowSet(s2_windows),
     )
     network = Network(
         planes=(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import itertools
 import math
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
 TIME_TOLERANCE = 1e-9
@@ -67,6 +67,8 @@ class WindowSet:
     windows: overlapping or touching windows are then fused into one.
     """
 
+    __slots__ = ("_windows",)
+
     def __init__(self, windows: Iterable[TimeWindow] = ()) -> None:
         items = tuple(windows)
         for previous, current in itertools.pairwise(items):
@@ -87,6 +89,23 @@ class WindowSet:
     def windows(self) -> tuple[TimeWindow, ...]:
         """The windows of the set, sorted by start and pairwise disjoint."""
         return self._windows
+
+    def __iter__(self) -> Iterator[TimeWindow]:
+        return iter(self._windows)
+
+    def __len__(self) -> int:
+        return len(self._windows)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, WindowSet):
+            return NotImplemented
+        return self._windows == other._windows
+
+    def __hash__(self) -> int:
+        return hash(self._windows)
+
+    def __repr__(self) -> str:
+        return f"WindowSet({list(self._windows)!r})"
 
     def first_gap(
         self, ready: float, length: float, eps: float = TIME_TOLERANCE

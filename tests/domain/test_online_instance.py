@@ -5,6 +5,7 @@ import math
 import pytest
 
 from satedge_workflow_scheduler.common.errors import InstanceError
+from satedge_workflow_scheduler.common.intervals import WindowSet
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import Network, Plane
 from satedge_workflow_scheduler.domain.nodes import GroundStation, NodeId, Satellite
@@ -36,7 +37,7 @@ def _instance(
     committed: Schedule = OFFLINE,
     plan_release: dict[NodeId, float] | None = None,
 ) -> ProblemInstance:
-    s1 = Satellite("S1", plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=())
+    s1 = Satellite("S1", plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=WindowSet())
     network = Network(
         planes=(Plane(id=1, satellites=(s1,), com="S1"),),
         ground_station=GroundStation("G"),

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from satedge_workflow_scheduler.common.intervals import TimeWindow
+from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
@@ -26,12 +26,14 @@ def _instance(
     arcs: tuple[Arc, ...] = (),
     release: float = 0.0,
 ) -> ProblemInstance:
-    s1 = Satellite(id="S1", plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=s1_windows)
+    s1 = Satellite(
+        id="S1", plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=WindowSet(s1_windows)
+    )
     s2 = Satellite(
         id="S2",
         plmm_capacity=10.0,
         hpc_rate=1.0,
-        hpc_windows=(TimeWindow(0.0, 1000.0),),
+        hpc_windows=WindowSet((TimeWindow(0.0, 1000.0),)),
     )
     network = Network(
         planes=(
@@ -69,7 +71,7 @@ def test_hpc_window_before_the_contact_wins() -> None:
     # Contact: opens at 50, sent by 52.
     instance = _instance(
         (TimeWindow(10.0, 100.0),),
-        arcs=(_arc(WindowedAvailability((TimeWindow(50.0, 100.0),))),),
+        arcs=(_arc(WindowedAvailability(WindowSet((TimeWindow(50.0, 100.0),)))),),
     )
     assert _raw(instance) == pytest.approx(23.0)
 
@@ -78,7 +80,7 @@ def test_contact_before_the_hpc_window_wins() -> None:
     # Contact: opens at 5, sent by 7. HPC: starts at 30, ends at 43.
     instance = _instance(
         (TimeWindow(30.0, 100.0),),
-        arcs=(_arc(WindowedAvailability((TimeWindow(5.0, 100.0),))),),
+        arcs=(_arc(WindowedAvailability(WindowSet((TimeWindow(5.0, 100.0),)))),),
     )
     assert _raw(instance) == pytest.approx(7.0)
 

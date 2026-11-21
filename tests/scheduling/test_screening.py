@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from satedge_workflow_scheduler.common.intervals import TimeWindow
+from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import Network, Plane
 from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
@@ -18,8 +18,12 @@ from satedge_workflow_scheduler.scheduling.screening import (
 
 
 def _network(s1_window: float = 20.0, s2_window: float = 20.0) -> Network:
-    s1 = Satellite("S1", 10.0, hpc_rate=1.0, hpc_windows=(TimeWindow(0.0, s1_window),))
-    s2 = Satellite("S2", 10.0, hpc_rate=1.0, hpc_windows=(TimeWindow(0.0, s2_window),))
+    s1 = Satellite(
+        "S1", 10.0, hpc_rate=1.0, hpc_windows=WindowSet((TimeWindow(0.0, s1_window),))
+    )
+    s2 = Satellite(
+        "S2", 10.0, hpc_rate=1.0, hpc_windows=WindowSet((TimeWindow(0.0, s2_window),))
+    )
     return Network(
         planes=(
             Plane(id=1, satellites=(s1,), com="S1"),

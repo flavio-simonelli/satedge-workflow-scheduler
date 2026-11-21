@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from satedge_workflow_scheduler.common.errors import SolverError
-from satedge_workflow_scheduler.common.intervals import TimeWindow
+from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
     Arc,
@@ -24,7 +24,7 @@ def _sat(sid: str) -> Satellite:
         id=sid,
         plmm_capacity=10.0,
         hpc_rate=1.0,
-        hpc_windows=(TimeWindow(0.0, 1000.0),),
+        hpc_windows=WindowSet((TimeWindow(0.0, 1000.0),)),
     )
 
 

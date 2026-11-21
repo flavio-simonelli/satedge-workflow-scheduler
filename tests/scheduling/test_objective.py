@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from satedge_workflow_scheduler.common.errors import InstanceError, SolverError
-from satedge_workflow_scheduler.common.intervals import TimeWindow
+from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
@@ -42,7 +42,7 @@ def _instance(requests: tuple[Request, ...], horizon: float = 100.0) -> ProblemI
         id="S1",
         plmm_capacity=10.0,
         hpc_rate=1.0,
-        hpc_windows=(TimeWindow(0.0, 1000.0),),
+        hpc_windows=WindowSet((TimeWindow(0.0, 1000.0),)),
     )
     network = Network(
         planes=(Plane(id=1, satellites=(sat,), com="S1"),),

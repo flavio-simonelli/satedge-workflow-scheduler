@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from functools import cached_property
 
 from satedge_workflow_scheduler.common.errors import InstanceError
-from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
+from satedge_workflow_scheduler.common.intervals import WindowSet
 from satedge_workflow_scheduler.domain.nodes import GroundStation, NodeId, Satellite
 
 
@@ -48,16 +48,10 @@ class WindowedAvailability:
     """An arc available only in its visibility windows (contact plan).
 
     Attributes:
-        windows: Visibility windows, sorted and disjoint.
+        windows: Visibility windows.
     """
 
-    windows: tuple[TimeWindow, ...]
-
-    def __post_init__(self) -> None:
-        try:
-            WindowSet(self.windows)
-        except ValueError as error:
-            raise InstanceError(f"visibility windows: {error}") from error
+    windows: WindowSet
 
 
 type Availability = AlwaysAvailable | WindowedAvailability

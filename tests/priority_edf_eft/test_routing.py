@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from satedge_workflow_scheduler.common.intervals import TimeWindow
+from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
     Arc,
@@ -28,7 +28,7 @@ def _sat(sid: str) -> Satellite:
         id=sid,
         plmm_capacity=10.0,
         hpc_rate=1.0,
-        hpc_windows=(TimeWindow(0.0, 1000.0),),
+        hpc_windows=WindowSet((TimeWindow(0.0, 1000.0),)),
     )
 
 
@@ -70,7 +70,7 @@ def test_always_available_arc_arrives_after_transmission_and_latency() -> None:
 
 
 def test_windowed_arc_waits_until_the_window_opens() -> None:
-    windows = WindowedAvailability((TimeWindow(10.0, 20.0),))
+    windows = WindowedAvailability(WindowSet((TimeWindow(10.0, 20.0),)))
     network, _, router = _setup(_arc("S1", "S2", windows))
     arc = _arc_by_name(network, "S1", "S2")
 
@@ -79,7 +79,9 @@ def test_windowed_arc_waits_until_the_window_opens() -> None:
 
 def test_window_too_short_for_transmission_and_latency_is_skipped() -> None:
     # the first window is 2 s long, but 2 s transmission + 1 s latency need 3 s
-    windows = WindowedAvailability((TimeWindow(10.0, 12.0), TimeWindow(20.0, 30.0)))
+    windows = WindowedAvailability(
+        WindowSet((TimeWindow(10.0, 12.0), TimeWindow(20.0, 30.0)))
+    )
     network, _, router = _setup(_arc("S1", "S2", windows))
     arc = _arc_by_name(network, "S1", "S2")
 
@@ -87,7 +89,7 @@ def test_window_too_short_for_transmission_and_latency_is_skipped() -> None:
 
 
 def test_windowed_arc_with_no_usable_window_has_no_departure() -> None:
-    windows = WindowedAvailability((TimeWindow(10.0, 11.0),))
+    windows = WindowedAvailability(WindowSet((TimeWindow(10.0, 11.0),)))
     network, _, router = _setup(_arc("S1", "S2", windows))
     arc = _arc_by_name(network, "S1", "S2")
 
@@ -104,7 +106,7 @@ def test_busy_arc_in_the_ledger_delays_the_departure() -> None:
 
 
 def test_two_hops_beat_a_direct_arc_with_a_late_window() -> None:
-    late = WindowedAvailability((TimeWindow(50.0, 100.0),))
+    late = WindowedAvailability(WindowSet((TimeWindow(50.0, 100.0),)))
     _, _, router = _setup(
         _arc("S1", "S2", late),
         _arc("S1", "S3", AlwaysAvailable()),

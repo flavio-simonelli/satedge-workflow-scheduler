@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from satedge_workflow_scheduler.common.intervals import TimeWindow
+from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
     Arc,
@@ -24,7 +24,9 @@ EPS = 1e-9
 
 
 def _sat(sid: str, windows: tuple[TimeWindow, ...]) -> Satellite:
-    return Satellite(id=sid, plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=windows)
+    return Satellite(
+        id=sid, plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=WindowSet(windows)
+    )
 
 
 def _request(raw: float) -> Request:

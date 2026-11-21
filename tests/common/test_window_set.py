@@ -95,3 +95,18 @@ def test_constructor_rejects_overlapping_or_touching_windows() -> None:
         WindowSet([TimeWindow(0.0, 6.0), TimeWindow(5.0, 9.0)])
     with pytest.raises(ValueError):
         WindowSet([TimeWindow(0.0, 5.0), TimeWindow(5.0, 9.0)])
+
+
+def test_window_sets_with_the_same_windows_are_equal_and_hash_alike() -> None:
+    a = WindowSet([TimeWindow(0.0, 10.0), TimeWindow(20.0, 30.0)])
+    b = WindowSet((TimeWindow(0.0, 10.0), TimeWindow(20.0, 30.0)))
+    assert a == b
+    assert hash(a) == hash(b)
+    assert a != WindowSet([TimeWindow(0.0, 10.0)])
+
+
+def test_a_window_set_iterates_over_its_windows_in_order() -> None:
+    windows = (TimeWindow(0.0, 10.0), TimeWindow(20.0, 30.0))
+    assert tuple(WindowSet(windows)) == windows
+    assert len(WindowSet(windows)) == 2
+    assert not WindowSet()

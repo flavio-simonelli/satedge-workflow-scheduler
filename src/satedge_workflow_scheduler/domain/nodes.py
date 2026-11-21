@@ -6,7 +6,7 @@ import math
 from dataclasses import dataclass
 
 from satedge_workflow_scheduler.common.errors import InstanceError
-from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
+from satedge_workflow_scheduler.common.intervals import WindowSet
 
 type NodeId = str
 
@@ -26,7 +26,7 @@ class Satellite:
     id: NodeId
     plmm_capacity: float
     hpc_rate: float
-    hpc_windows: tuple[TimeWindow, ...]
+    hpc_windows: WindowSet
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -35,10 +35,6 @@ class Satellite:
             raise InstanceError(f"satellite {self.id}: PLMM capacity must be > 0")
         if not (math.isfinite(self.hpc_rate) and self.hpc_rate > 0):
             raise InstanceError(f"satellite {self.id}: HPC rate must be finite and > 0")
-        try:
-            WindowSet(self.hpc_windows)
-        except ValueError as error:
-            raise InstanceError(f"HPC of satellite {self.id}: {error}") from error
 
     def hpc_io_time(self, size: float) -> float:
         """Time in seconds to read ``size`` Gb from the PLMM, or to write them into it."""

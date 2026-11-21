@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from satedge_workflow_scheduler.common.intervals import TimeWindow
+from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
@@ -46,12 +46,14 @@ def _setup(
     s2_capacity: float = 10.0,
     limit: float = 500.0,
 ) -> tuple[RequestPlanner, ResourceLedger, Request, ProblemInstance]:
-    s1 = Satellite(id="S1", plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=s1_windows)
+    s1 = Satellite(
+        id="S1", plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=WindowSet(s1_windows)
+    )
     s2 = Satellite(
         id="S2",
         plmm_capacity=s2_capacity,
         hpc_rate=1.0,
-        hpc_windows=(TimeWindow(0.0, 1000.0),),
+        hpc_windows=WindowSet((TimeWindow(0.0, 1000.0),)),
     )
     network = Network(
         planes=(
