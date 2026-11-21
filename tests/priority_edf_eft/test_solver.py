@@ -21,7 +21,7 @@ from satedge_workflow_scheduler.solvers.priority_edf_eft import PriorityEdfEftSo
 
 U, N = Priority.URGENT, Priority.NON_URGENT
 
-Checker = Callable[[ProblemInstance, Solution], None]
+Checker = Callable[[ProblemInstance, Solution, DeadlineMode], None]
 
 
 def _arc(source: str, target: str) -> Arc:
@@ -100,7 +100,7 @@ def test_hard_mode_delivers_a_feasible_request(check_valid: Checker) -> None:
     assert solution.outcome("r").delivery_time == pytest.approx(22.0)
     assert solution.objective is not None
     assert solution.objective.primary == pytest.approx(0.0)
-    check_valid(instance, solution)
+    check_valid(instance, solution, DeadlineMode.HARD)
 
 
 def test_hard_mode_rejects_an_impossible_request_without_disturbing_the_others(
@@ -122,7 +122,7 @@ def test_hard_mode_rejects_an_impossible_request_without_disturbing_the_others(
     # rejecting the only non urgent request costs its κ, which is 1
     assert together.objective is not None
     assert together.objective.primary == pytest.approx(1.0)
-    check_valid(_instance((feasible, impossible)), together)
+    check_valid(_instance((feasible, impossible)), together, DeadlineMode.HARD)
 
 
 def test_soft_mode_serves_a_late_request_and_charges_its_tardiness(
@@ -136,7 +136,7 @@ def test_soft_mode_serves_a_late_request_and_charges_its_tardiness(
     assert solution.objective is not None
     assert solution.objective.primary == pytest.approx(17.0)
     assert solution.objective.response == pytest.approx(22.0)
-    check_valid(instance, solution)
+    check_valid(instance, solution, DeadlineMode.SOFT)
 
 
 def test_soft_mode_fails_when_a_request_cannot_meet_the_horizon() -> None:
@@ -160,7 +160,7 @@ def test_urgent_request_gets_the_hpc_before_a_non_urgent_one_with_an_earlier_dea
 
     assert solution.outcome("u").accepted
     assert not solution.outcome("n").accepted
-    check_valid(instance, solution)
+    check_valid(instance, solution, DeadlineMode.HARD)
 
 
 def test_solver_keeps_no_state_between_calls() -> None:
@@ -185,7 +185,7 @@ def test_soft_mode_retries_later_when_the_plmm_is_full(check_valid: Checker) -> 
     solution = _solver_with_retries(100).solve(instance)
     assert solution.outcome("u").accepted
     assert solution.outcome("n").accepted
-    check_valid(instance, solution)
+    check_valid(instance, solution, DeadlineMode.SOFT)
 
 
 def test_soft_mode_without_retries_cannot_plan_the_second_request() -> None:
@@ -221,7 +221,7 @@ def test_soft_mode_plans_both_raw_data_when_the_plmm_holds_them(
     solution = _solver_with_retries(100).solve(instance)
     assert solution.outcome("u").accepted
     assert solution.outcome("n").accepted
-    check_valid(instance, solution)
+    check_valid(instance, solution, DeadlineMode.SOFT)
 
 
 def test_hard_mode_records_why_an_impossible_request_is_rejected() -> None:
