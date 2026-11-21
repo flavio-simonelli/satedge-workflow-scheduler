@@ -118,7 +118,8 @@ class Network:
     Attributes:
         planes: The orbital planes, with unique ids and disjoint satellites.
         ground_station: The ground station node.
-        arcs: The directed arcs, with unique (source, target) pairs.
+        arcs: The directed arcs, with unique (source, target) pairs. Two opposite arcs are
+            the two directions of one full-duplex link and have the same availability.
     """
 
     planes: tuple[Plane, ...]
@@ -151,6 +152,16 @@ class Network:
             if (arc.source, arc.target) in seen:
                 raise InstanceError(f"duplicate arc {arc.name}")
             seen.add((arc.source, arc.target))
+
+        # a full-duplex link is two opposite arcs, and visibility is symmetric
+        by_pair = {(arc.source, arc.target): arc for arc in self.arcs}
+        for (source, target), arc in by_pair.items():
+            reverse = by_pair.get((target, source))
+            if reverse is not None and reverse.availability != arc.availability:
+                raise InstanceError(
+                    f"arcs {arc.name} and {reverse.name} are the two directions of one "
+                    "link and must have the same availability"
+                )
 
     @cached_property
     def satellites(self) -> tuple[Satellite, ...]:
