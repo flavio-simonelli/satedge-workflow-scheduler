@@ -106,7 +106,7 @@ def test_committed_request_reserves_the_hpc_and_the_plmm() -> None:
         planner.plan(request, limit=500.0, not_before=None, tx=tx, extra_plmm={})
         tx.commit()
 
-    assert ledger.timeline(HpcKey("S2")).windows == (TimeWindow(3.0, 18.0),)
+    assert ledger.timeline(HpcKey("S2")).intervals == (TimeWindow(3.0, 18.0),)
     assert len(ledger.plmm("S2")) == 2
 
 
@@ -137,5 +137,5 @@ def test_plmm_overflow_is_a_failure_and_leaves_no_trace() -> None:
             request, limit=500.0, not_before=None, tx=tx, extra_plmm={}
         )
     assert result == PlanFailure("PLMM capacity exceeded", plmm=True)
-    assert ledger.timeline(HpcKey("S2")).windows == ()
+    assert ledger.timeline(HpcKey("S2")).intervals == ()
     assert ledger.plmm("S2") == ()

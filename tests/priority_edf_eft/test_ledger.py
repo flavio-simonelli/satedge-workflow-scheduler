@@ -57,8 +57,8 @@ def test_reservation_without_commit_is_discarded() -> None:
     ledger = _ledger()
     with ledger.transaction() as tx:
         tx.reserve(HpcKey("S1"), TimeWindow(0.0, 10.0))
-        assert ledger.timeline(HpcKey("S1")).windows == (TimeWindow(0.0, 10.0),)
-    assert ledger.timeline(HpcKey("S1")).windows == ()
+        assert ledger.timeline(HpcKey("S1")).intervals == (TimeWindow(0.0, 10.0),)
+    assert ledger.timeline(HpcKey("S1")).intervals == ()
 
 
 def test_committed_reservation_stays() -> None:
@@ -66,7 +66,7 @@ def test_committed_reservation_stays() -> None:
     with ledger.transaction() as tx:
         tx.reserve(HpcKey("S1"), TimeWindow(0.0, 10.0))
         tx.commit()
-    assert ledger.timeline(HpcKey("S1")).windows == (TimeWindow(0.0, 10.0),)
+    assert ledger.timeline(HpcKey("S1")).intervals == (TimeWindow(0.0, 10.0),)
 
 
 def test_exception_rolls_back_the_transaction() -> None:
@@ -75,7 +75,7 @@ def test_exception_rolls_back_the_transaction() -> None:
         tx.reserve(ArcKey("S1", "S2"), TimeWindow(0.0, 3.0))
         tx.add_occupancies("S1", [_occ()])
         raise RuntimeError("boom")
-    assert ledger.timeline(ArcKey("S1", "S2")).windows == ()
+    assert ledger.timeline(ArcKey("S1", "S2")).intervals == ()
     assert ledger.plmm("S1") == ()
 
 
@@ -97,7 +97,7 @@ def test_committed_intervals_are_not_counted_twice_after_commit() -> None:
     with ledger.transaction() as tx:
         tx.reserve(HpcKey("S1"), TimeWindow(0.0, 10.0))
         tx.commit()
-        assert ledger.timeline(HpcKey("S1")).windows == (TimeWindow(0.0, 10.0),)
+        assert ledger.timeline(HpcKey("S1")).intervals == (TimeWindow(0.0, 10.0),)
 
 
 def test_nested_transaction_is_an_error() -> None:
@@ -134,4 +134,4 @@ def test_writing_after_the_block_has_ended_is_an_error_and_changes_nothing() -> 
         tx.reserve(HpcKey("S1"), TimeWindow(0.0, 10.0))
     with pytest.raises(RuntimeError):
         tx.commit()
-    assert ledger.timeline(HpcKey("S1")).windows == ()
+    assert ledger.timeline(HpcKey("S1")).intervals == ()

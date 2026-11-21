@@ -1,4 +1,10 @@
-"""Time intervals: the time window value object shared by the problem model and the solvers."""
+"""Time intervals and the two kinds of sets of intervals used by the model and the solvers.
+
+- :class:`WindowSet`: windows of *availability*, such as the computing windows of an HPC or
+  the visibility windows of a link. An activity must lie *inside* one of them.
+- :class:`BusyTimeline`: intervals in which a resource is already *taken*, such as the
+  reservations on an HPC or an arc. An activity must lie *outside* all of them.
+"""
 
 from __future__ import annotations
 
@@ -15,8 +21,8 @@ TIME_TOLERANCE = 1e-9
 class TimeWindow:
     """A closed time interval ``[start, end]`` in seconds, with ``start < end``.
 
-    Used both for the HPC computing windows of a satellite and for the visibility
-    windows of an arc (contact plan).
+    Used for the windows of a :class:`WindowSet` and for the intervals of a
+    :class:`BusyTimeline`.
     """
 
     start: float
@@ -60,11 +66,10 @@ class TimeWindow:
 
 
 class WindowSet:
-    """An immutable set of time windows, kept sorted and pairwise disjoint.
+    """Windows of availability of a resource: an activity must lie inside one of them.
 
-    The constructor requires its input to be already sorted and pairwise disjoint, and
-    raises ``ValueError`` otherwise. Use :meth:`merged` to build a set from arbitrary
-    windows: overlapping or touching windows are then fused into one.
+    The windows are given by the instance, sorted and pairwise disjoint: the constructor
+    raises ``ValueError`` otherwise. Two windows that only touch are not disjoint.
     """
 
     __slots__ = ("_windows",)
@@ -80,14 +85,9 @@ class WindowSet:
                 )
         self._windows: tuple[TimeWindow, ...] = items
 
-    @classmethod
-    def merged(cls, windows: Iterable[TimeWindow]) -> WindowSet:
-        """Build the set from any windows, fusing those that overlap or touch."""
-        return cls(_merge(windows))
-
     @property
     def windows(self) -> tuple[TimeWindow, ...]:
-        """The windows of the set, sorted by start and pairwise disjoint."""
+        """The windows, sorted by start and pairwise disjoint."""
         return self._windows
 
     def __iter__(self) -> Iterator[TimeWindow]:
@@ -107,28 +107,61 @@ class WindowSet:
     def __repr__(self) -> str:
         return f"WindowSet({list(self._windows)!r})"
 
+
+class BusyTimeline:
+    """Intervals in which a resource is already taken: an activity must avoid all of them.
+
+    Reservations accumulate one after the other, so the constructor accepts any intervals
+    and fuses those that overlap or touch: two adjacent reservations are one longer busy
+    interval. The timeline is immutable; :meth:`with_interval` returns a new one.
+    """
+
+    __slots__ = ("_intervals",)
+
+    def __init__(self, intervals: Iterable[TimeWindow] = ()) -> None:
+        self._intervals: tuple[TimeWindow, ...] = _merge(intervals)
+
+    @property
+    def intervals(self) -> tuple[TimeWindow, ...]:
+        """The busy intervals, sorted by start and pairwise disjoint."""
+        return self._intervals
+
+    def __iter__(self) -> Iterator[TimeWindow]:
+        return iter(self._intervals)
+
+    def __len__(self) -> int:
+        return len(self._intervals)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, BusyTimeline):
+            return NotImplemented
+        return self._intervals == other._intervals
+
+    def __hash__(self) -> int:
+        return hash(self._intervals)
+
+    def __repr__(self) -> str:
+        return f"BusyTimeline({list(self._intervals)!r})"
+
     def first_gap(
         self, ready: float, length: float, eps: float = TIME_TOLERANCE
     ) -> float:
-        """Return the earliest ``t >= ready`` such that ``[t, t + length)`` meets no window.
+        """Earliest ``t >= ready`` such that ``[t, t + length)`` meets no busy interval.
 
-        Two windows that only touch do not overlap the candidate interval, up to ``eps``.
+        An interval that only touches the candidate does not overlap it, up to ``eps``.
         """
         candidate = ready
-        for window in self._windows:
-            if window.end <= candidate + eps:
+        for interval in self._intervals:
+            if interval.end <= candidate + eps:
                 continue
-            if window.start >= candidate + length - eps:
+            if interval.start >= candidate + length - eps:
                 break
-            candidate = max(candidate, window.end)
+            candidate = max(candidate, interval.end)
         return candidate
 
-    def union_with(self, window: TimeWindow) -> WindowSet:
-        """Return a new set that also contains ``window``, fused with its neighbours.
-
-        The receiver is not modified.
-        """
-        return WindowSet.merged((*self._windows, window))
+    def with_interval(self, interval: TimeWindow) -> BusyTimeline:
+        """A new timeline that also holds ``interval``. The receiver is not modified."""
+        return BusyTimeline((*self._intervals, interval))
 
 
 def _merge(windows: Iterable[TimeWindow]) -> tuple[TimeWindow, ...]:

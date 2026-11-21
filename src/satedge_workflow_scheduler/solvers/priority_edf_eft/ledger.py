@@ -17,7 +17,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 from satedge_workflow_scheduler.common.errors import SolverError
-from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
+from satedge_workflow_scheduler.common.intervals import BusyTimeline, TimeWindow
 from satedge_workflow_scheduler.domain.network import Network
 from satedge_workflow_scheduler.domain.nodes import NodeId
 from satedge_workflow_scheduler.scheduling.plmm_occupancy import PlmmOccupancyInterval
@@ -46,7 +46,7 @@ class ResourceLedger:
 
     def __init__(self, network: Network) -> None:
         self._network = network
-        self._timelines: dict[ResourceKey, WindowSet] = {}
+        self._timelines: dict[ResourceKey, BusyTimeline] = {}
         self._plmm: dict[NodeId, tuple[PlmmOccupancyInterval, ...]] = {}
         self._pending_intervals: dict[ResourceKey, list[TimeWindow]] = defaultdict(list)
         self._pending_plmm: dict[NodeId, list[PlmmOccupancyInterval]] = defaultdict(
@@ -54,12 +54,12 @@ class ResourceLedger:
         )
         self._in_transaction = False
 
-    def timeline(self, key: ResourceKey) -> WindowSet:
+    def timeline(self, key: ResourceKey) -> BusyTimeline:
         """Busy timeline of a resource, with committed and tentative reservations."""
         self._check_key(key)
-        committed = self._timelines.get(key, WindowSet())
+        committed = self._timelines.get(key, BusyTimeline())
         pending = self._pending_intervals.get(key, [])
-        return WindowSet.merged((*committed.windows, *pending))
+        return BusyTimeline((*committed.intervals, *pending))
 
     def plmm(self, node: NodeId) -> tuple[PlmmOccupancyInterval, ...]:
         """PLMM occupancies of a satellite, with committed and tentative ones."""
@@ -104,9 +104,9 @@ class ResourceLedger:
 
     def _commit(self) -> None:
         for key, intervals in self._pending_intervals.items():
-            timeline = self._timelines.get(key, WindowSet())
+            timeline = self._timelines.get(key, BusyTimeline())
             for interval in intervals:
-                timeline = timeline.union_with(interval)
+                timeline = timeline.with_interval(interval)
             self._timelines[key] = timeline
         for node, items in self._pending_plmm.items():
             self._plmm[node] = (*self._plmm.get(node, ()), *items)
