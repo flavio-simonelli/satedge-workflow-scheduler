@@ -33,15 +33,24 @@ from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
 HORIZON = 600.0
 
 
-def sample_instance() -> ProblemInstance:
+def sample_instance(
+    plmm_capacity: Mapping[str, float] | None = None,
+) -> ProblemInstance:
     """Two satellites, S1 with the raw data, and the ground station G.
+
+    Both PLMMs hold 10 Gb, unless ``plmm_capacity`` gives other capacities.
 
     S1 -> S2 is always available; S2 -> G is available only in [0, 1000]. Both satellites
     compute in [0, 100], with an HPC rate of 1 Gbps.
     """
     windows = WindowSet((TimeWindow(0.0, 100.0),))
-    s1 = Satellite(id="S1", plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=windows)
-    s2 = Satellite(id="S2", plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=windows)
+    capacity = {"S1": 10.0, "S2": 10.0, **(plmm_capacity or {})}
+    s1 = Satellite(
+        id="S1", plmm_capacity=capacity["S1"], hpc_rate=1.0, hpc_windows=windows
+    )
+    s2 = Satellite(
+        id="S2", plmm_capacity=capacity["S2"], hpc_rate=1.0, hpc_windows=windows
+    )
     arcs = (
         Arc("S1", "S2", capacity=1.0, latency=1.0, availability=AlwaysAvailable()),
         Arc("S2", "S1", capacity=1.0, latency=1.0, availability=AlwaysAvailable()),

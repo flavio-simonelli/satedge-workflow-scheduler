@@ -26,6 +26,7 @@ from satedge_workflow_scheduler.solvers.milp.backends.ports import ModelSink, Va
 from satedge_workflow_scheduler.solvers.milp.blocks.base import (
     BuildContext,
     ConstraintBlock,
+    OnSubset,
 )
 from satedge_workflow_scheduler.solvers.milp.blocks.plmm_occupation import (
     PlmmOccupation,
@@ -49,7 +50,7 @@ class EventVariables:
     on: Mapping[tuple[DataKey, NodeId, int], Var]
 
 
-class PlmmEventsBlock(ConstraintBlock[EventVariables]):
+class PlmmEventsBlock(OnSubset[NodeId], ConstraintBlock[EventVariables]):
     """The capacity of the PLMM at each event (version B of the document)."""
 
     name = "plmm events"
@@ -62,13 +63,13 @@ class PlmmEventsBlock(ConstraintBlock[EventVariables]):
         capacity = data.plmm_big_m
         date = {
             (v, k): sink.add_var(0.0, capacity, VarKind.CONTINUOUS, f"tau[{v},{k}]")
-            for v in data.satellites
+            for v in self.chosen(data.satellites)
             for k in range(count)
         }
         on = {
             (a, v, k): sink.add_var(0.0, 1.0, VarKind.BINARY, f"o[{a},{v},{k}]")
             for a in data.data
-            for v in data.satellites
+            for v in self.chosen(data.satellites)
             for k in range(count)
         }
         return EventVariables(date, on)
@@ -86,13 +87,13 @@ class PlmmEventsBlock(ConstraintBlock[EventVariables]):
         def date(v: NodeId, k: int) -> LinExpr:
             return LinExpr.var(aux.date[(v, k)])
 
-        for v in data.satellites:
+        for v in self.chosen(data.satellites):
             # dates of the events do not decrease
             for k in range(count - 1):
                 yield (date(v, k + 1) - date(v, k) >= 0).named(f"event-order[{v},{k}]")
 
         for a in data.data:
-            for v in data.satellites:
+            for v in self.chosen(data.satellites):
                 q = presence(ctx, a, v)
                 start = LinExpr.var(occupation.start[(a, v)])
                 end = LinExpr.var(occupation.end[(a, v)])
@@ -134,7 +135,7 @@ class PlmmEventsBlock(ConstraintBlock[EventVariables]):
                         >= 0
                     ).named(f"end[{a},{v},{k}]")
 
-        for v in data.satellites:
+        for v in self.chosen(data.satellites):
             for k in range(count):
                 # (capacity) Σ_a d_a o_{a,v,k} ≤ K_v
                 used = LinExpr.total(data.size(a) * on(a, v, k) for a in data.data)

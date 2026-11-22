@@ -10,7 +10,7 @@ may create variables first, in :meth:`ConstraintBlock.variables`. The template m
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from typing import ClassVar, cast, final
 
@@ -61,6 +61,27 @@ class BuildContext:
     data: ModelData
     variables: DecisionVariables
     families: Families = field(default_factory=Families)
+
+
+class OnSubset[K]:
+    """A block written on a subset of its keys only, all of them by default.
+
+    The lazy strategy (rule 10 of the document) adds a group of constraints only on the keys
+    that a solution violates, for example the satellites whose PLMM is overloaded: the blocks of
+    the group receive those keys here.
+
+    Args:
+        keys: The keys that the block writes, or ``None`` for all of them.
+    """
+
+    def __init__(self, keys: Iterable[K] | None = None) -> None:
+        self._only = None if keys is None else frozenset(keys)
+
+    def chosen(self, keys: Iterable[K]) -> tuple[K, ...]:
+        """The keys among ``keys`` that the block writes, in the same order."""
+        if self._only is None:
+            return tuple(keys)
+        return tuple(k for k in keys if k in self._only)
 
 
 class ConstraintBlock[A = None](ABC):

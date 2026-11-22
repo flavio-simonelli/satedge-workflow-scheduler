@@ -12,6 +12,7 @@ error, not a silent omission: a model without a block is a different model.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
@@ -47,6 +48,7 @@ from satedge_workflow_scheduler.solvers.milp.blocks.tardiness import TardinessBl
 from satedge_workflow_scheduler.solvers.milp.blocks.task_overlap import TaskOverlapBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.task_timing import TaskTimingBlock
 from satedge_workflow_scheduler.solvers.milp.config import (
+    LazyGroup,
     Level,
     MilpConfig,
     PlmmFormulation,
@@ -115,18 +117,42 @@ IMPLEMENTED: dict[str, type[ConstraintBlock[Any]]] = {
 """The blocks with a class. Each block is registered here when it is written."""
 
 
-def block_names(config: MilpConfig, online: bool = False) -> tuple[str, ...]:
+Restricted = Mapping[LazyGroup, frozenset[Any]]
+"""For each lazy group, the keys its blocks are written on: an empty set leaves them out."""
+
+_GROUP_OF_PLACEHOLDER: dict[str, LazyGroup] = {"plmm": LazyGroup.PLMM}
+"""The placeholder of each lazy group in the lists of the levels."""
+
+_RESTRICTABLE: dict[
+    str, tuple[LazyGroup, Callable[[frozenset[Any] | None], ConstraintBlock[Any]]]
+] = {
+    "plmm_occupation": (LazyGroup.PLMM, PlmmOccupationBlock),
+    "plmm_flow": (LazyGroup.PLMM, PlmmFlowBlock),
+    "plmm_events": (LazyGroup.PLMM, PlmmEventsBlock),
+}
+"""The blocks that can be written on a subset of their keys, with their group: the lazy
+strategy writes them only where a solution violates them."""
+
+
+def block_names(
+    config: MilpConfig,
+    online: bool = False,
+    restricted: Restricted | None = None,
+) -> tuple[str, ...]:
     """The names of the blocks of the model of ``config``, in the order they are built.
 
     The names are those of the document's levels, and they are returned whether or not the
     block is implemented. With ``online``, the instance has an online state, and the blocks
     that fix the committed calendar and impose the plan release are added at the end of the
-    level: the tasks at every level, the transmissions only where they are routed.
+    level: the tasks at every level, the transmissions only where they are routed. With
+    ``restricted``, the blocks of each lazy group in it are written only on its keys, and not at
+    all if the set is empty; a group not in it is written on all of its keys.
     """
     names: list[str] = []
     for name in _BLOCKS_OF_LEVEL[config.level]:
         if name == "plmm":
-            names.extend(_PLMM_BLOCKS_OF_FORMULATION[config.plmm_formulation])
+            if _written(restricted, _GROUP_OF_PLACEHOLDER[name]):
+                names.extend(_PLMM_BLOCKS_OF_FORMULATION[config.plmm_formulation])
         else:
             names.append(name)
     if config.deadline is DeadlineMode.SOFT:
@@ -145,14 +171,35 @@ def block_names(config: MilpConfig, online: bool = False) -> tuple[str, ...]:
     return tuple(names)
 
 
-def blocks_for(config: MilpConfig, online: bool = False) -> tuple[ConstraintBlock, ...]:
+def blocks_for(
+    config: MilpConfig,
+    online: bool = False,
+    restricted: Restricted | None = None,
+) -> tuple[ConstraintBlock[Any], ...]:
     """The blocks of the model of ``config``, instantiated and in the order they are built.
+
+    The arguments are those of :func:`block_names`.
 
     Raises:
         ModelBuildError: If a block of the level has no class yet.
     """
-    names = block_names(config, online)
+    names = block_names(config, online, restricted)
     missing = [name for name in names if name not in IMPLEMENTED]
     if missing:
         raise ModelBuildError(f"blocks not implemented yet: {', '.join(missing)}")
-    return tuple(IMPLEMENTED[name]() for name in names)
+    blocks: list[ConstraintBlock[Any]] = []
+    for name in names:
+        if name in _RESTRICTABLE:
+            group, make = _RESTRICTABLE[name]
+            keys = restricted.get(group) if restricted is not None else None
+            blocks.append(make(keys))
+        else:
+            blocks.append(IMPLEMENTED[name]())
+    return tuple(blocks)
+
+
+def _written(restricted: Restricted | None, group: LazyGroup) -> bool:
+    """Whether the blocks of ``group`` are in the model: unless restricted to no key."""
+    if restricted is None or group not in restricted:
+        return True
+    return bool(restricted[group])

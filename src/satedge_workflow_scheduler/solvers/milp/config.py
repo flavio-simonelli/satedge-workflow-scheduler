@@ -49,13 +49,16 @@ class Level(IntEnum):
         return self >= Level.PLMM_CAPACITY
 
 
-class PlmmStrategy(Enum):
-    """How the capacity of the PLMM is imposed."""
+class LazyGroup(Enum):
+    """A group of constraints that the lazy strategy may add only where a solution violates it.
 
-    EAGER = "eager"
-    """All the PLMM constraints are in the model from the start."""
-    LAZY = "lazy"
-    """They are added only to the satellites that the solution overloads (section 6, rule 10)."""
+    The model of a lazy group starts without its constraints, and gets them on the keys that a
+    solution violates, round after round (section 6, rule 10). A group not in the configuration
+    is in the model from the start.
+    """
+
+    PLMM = "plmm"
+    """The capacity of the PLMM, added on the satellites that a solution overloads."""
 
 
 class PlmmFormulation(Enum):
@@ -89,7 +92,8 @@ class MilpConfig:
         deadline: Hard deadlines (requests may be rejected) or soft ones (all are served).
         reductions: Whether the exact reductions of section 6 (rules 1 to 6) are applied.
         strengthening: The optional strengthenings.
-        plmm_strategy: How the PLMM is imposed. Only meaningful from level 6 on.
+        lazy: The groups of constraints added lazily, only where a solution violates them. Empty
+            by default: every constraint is in the model from the start.
         plmm_formulation: Which formulation of the PLMM capacity the model uses. Only meaningful
             from level 6 on.
         polish: Whether the LP is re-solved with the binaries fixed, to remove the residuals
@@ -104,7 +108,7 @@ class MilpConfig:
     deadline: DeadlineMode = DeadlineMode.HARD
     reductions: bool = True
     strengthening: Strengthening = field(default_factory=Strengthening)
-    plmm_strategy: PlmmStrategy = PlmmStrategy.EAGER
+    lazy: frozenset[LazyGroup] = frozenset()
     plmm_formulation: PlmmFormulation = PlmmFormulation.FLOW
     polish: bool = False
     solve: SolveParams = field(default_factory=SolveParams)
@@ -118,7 +122,7 @@ class MilpConfig:
             raise MilpConfigError(
                 f"the strengthenings need routed communication, not level {self.level}"
             )
-        if self.plmm_strategy is PlmmStrategy.LAZY and not self.level.plmm:
+        if LazyGroup.PLMM in self.lazy and not self.level.plmm:
             raise MilpConfigError(
                 f"the lazy PLMM needs level 6 or more, not {self.level}"
             )

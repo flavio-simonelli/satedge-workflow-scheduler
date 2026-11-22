@@ -22,6 +22,7 @@ from satedge_workflow_scheduler.solvers.milp.backends.ports import ModelSink, Va
 from satedge_workflow_scheduler.solvers.milp.blocks.base import (
     BuildContext,
     ConstraintBlock,
+    OnSubset,
 )
 from satedge_workflow_scheduler.solvers.milp.blocks.path import RoutingVariables
 from satedge_workflow_scheduler.solvers.milp.blocks.store_and_forward import (
@@ -47,7 +48,7 @@ class PlmmOccupation:
     end: Mapping[Occupation, Var]
 
 
-class PlmmOccupationBlock(ConstraintBlock[PlmmOccupation]):
+class PlmmOccupationBlock(OnSubset[NodeId], ConstraintBlock[PlmmOccupation]):
     """Occupation intervals of the PLMM (20a)–(21b)."""
 
     name = "plmm occupation"
@@ -57,7 +58,9 @@ class PlmmOccupationBlock(ConstraintBlock[PlmmOccupation]):
 
     def variables(self, ctx: BuildContext, sink: ModelSink) -> PlmmOccupation:
         capacity = ctx.data.plmm_big_m
-        slots = [(a, v) for a in ctx.data.data for v in ctx.data.satellites]
+        slots = [
+            (a, v) for a in ctx.data.data for v in self.chosen(ctx.data.satellites)
+        ]
         start = {
             (a, v): sink.add_var(0.0, capacity, VarKind.CONTINUOUS, f"occs[{a},{v}]")
             for a, v in slots
@@ -76,7 +79,7 @@ class PlmmOccupationBlock(ConstraintBlock[PlmmOccupation]):
         for a in data.data:
             producer = data.producer(a)
             consumer = data.consumer(a)
-            for v in data.satellites:
+            for v in self.chosen(data.satellites):
                 start = LinExpr.var(aux.start[(a, v)])
                 end = LinExpr.var(aux.end[(a, v)])
                 if producer is not None:
@@ -118,8 +121,8 @@ class PlmmOccupationBlock(ConstraintBlock[PlmmOccupation]):
                         >= 0
                     ).named(f"end-sent[{a},{e},{v}]")
             # (20b) ζ⁺_{a,v} ≤ b_r for the raw data, on its origin
-            if producer is None:
-                origin = data.origin(a.request_id)
+            origin = data.origin(a.request_id)
+            if producer is None and origin in self.chosen(data.satellites):
                 yield (
                     LinExpr.var(aux.start[(a, origin)]) <= data.release(a.request_id)
                 ).named(f"start-raw[{a}]")

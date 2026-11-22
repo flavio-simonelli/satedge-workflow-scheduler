@@ -27,6 +27,7 @@ from satedge_workflow_scheduler.solvers.milp.backends.ports import ModelSink, Va
 from satedge_workflow_scheduler.solvers.milp.blocks.base import (
     BuildContext,
     ConstraintBlock,
+    OnSubset,
 )
 from satedge_workflow_scheduler.solvers.milp.blocks.plmm_occupation import (
     PlmmOccupation,
@@ -61,7 +62,7 @@ class FlowVariables:
     unused: Mapping[NodeId, Var]
 
 
-class PlmmFlowBlock(ConstraintBlock[FlowVariables]):
+class PlmmFlowBlock(OnSubset[NodeId], ConstraintBlock[FlowVariables]):
     """The flow of the capacity of the PLMM (22)–(27), on the occupations of (20)–(21)."""
 
     name = "plmm flow"
@@ -70,19 +71,19 @@ class PlmmFlowBlock(ConstraintBlock[FlowVariables]):
 
     def variables(self, ctx: BuildContext, sink: ModelSink) -> FlowVariables:
         data = ctx.data
-        slots = [(a, v) for a in data.data for v in data.satellites]
+        slots = [(a, v) for a in data.data for v in self.chosen(data.satellites)]
         ordered = list(permutations(data.data, 2))
         before = {
             (a, b, v): sink.add_var(0.0, 1.0, VarKind.BINARY, f"pi[{a},{b},{v}]")
             for a, b in ordered
-            for v in data.satellites
+            for v in self.chosen(data.satellites)
         }
         flow = {
             (a, b, v): sink.add_var(
                 0.0, float("inf"), VarKind.CONTINUOUS, f"f[{a},{b},{v}]"
             )
             for a, b in ordered
-            for v in data.satellites
+            for v in self.chosen(data.satellites)
         }
         from_source = {
             (b, v): sink.add_var(
@@ -98,7 +99,7 @@ class PlmmFlowBlock(ConstraintBlock[FlowVariables]):
         }
         unused = {
             v: sink.add_var(0.0, float("inf"), VarKind.CONTINUOUS, f"finifin[{v}]")
-            for v in data.satellites
+            for v in self.chosen(data.satellites)
         }
         return FlowVariables(before, flow, from_source, to_sink, unused)
 
@@ -114,14 +115,14 @@ class PlmmFlowBlock(ConstraintBlock[FlowVariables]):
         big_m = data.plmm_big_m
         # (22) π_{a,b,v} + π_{b,a,v} ≤ 1, for a before b
         for a, b in combinations(data.data, 2):
-            for v in data.satellites:
+            for v in self.chosen(data.satellites):
                 yield (
                     LinExpr.var(aux.before[(a, b, v)])
                     + LinExpr.var(aux.before[(b, a, v)])
                     <= 1
                 ).named(f"order[{a},{b},{v}]")
         for a, b in permutations(data.data, 2):
-            for v in data.satellites:
+            for v in self.chosen(data.satellites):
                 # (23) ζ⁺_{b,v} ≥ ζ⁻_{a,v} − M^P(1 − π_{a,b,v})
                 yield (
                     LinExpr.var(occupation.start[(b, v)])
@@ -133,7 +134,7 @@ class PlmmFlowBlock(ConstraintBlock[FlowVariables]):
     def _flow(self, ctx: BuildContext, aux: FlowVariables) -> Iterator[Row]:
         data = ctx.data
         for a, b in permutations(data.data, 2):
-            for v in data.satellites:
+            for v in self.chosen(data.satellites):
                 # (24) f_{a,b,v} ≤ min(d_a, d_b) π_{a,b,v}
                 limit = min(data.size(a), data.size(b))
                 yield (
@@ -141,7 +142,7 @@ class PlmmFlowBlock(ConstraintBlock[FlowVariables]):
                     <= limit * LinExpr.var(aux.before[(a, b, v)])
                 ).named(f"flow-order[{a},{b},{v}]")
         for a in data.data:
-            for v in data.satellites:
+            for v in self.chosen(data.satellites):
                 # (25) Σ_{b≠a} f_{a,b,v} + ffin_{a,v} = d_a q_{a,v}
                 outgoing = LinExpr.total(
                     LinExpr.var(aux.flow[(a, b, v)]) for b in data.data if b != a
@@ -158,7 +159,7 @@ class PlmmFlowBlock(ConstraintBlock[FlowVariables]):
                     incoming + LinExpr.var(aux.from_source[(a, v)])
                     == data.size(a) * presence(ctx, a, v)
                 ).named(f"inflow[{a},{v}]")
-        for v in data.satellites:
+        for v in self.chosen(data.satellites):
             # (27) Σ_b fini_{b,v} + finifin_v = K_v
             total = LinExpr.total(
                 LinExpr.var(aux.from_source[(b, v)]) for b in data.data

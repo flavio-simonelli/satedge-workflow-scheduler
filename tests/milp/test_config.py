@@ -9,9 +9,9 @@ import pytest
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
 from satedge_workflow_scheduler.solvers.milp.backends.ports import SolveParams
 from satedge_workflow_scheduler.solvers.milp.config import (
+    LazyGroup,
     Level,
     MilpConfig,
-    PlmmStrategy,
     Strengthening,
 )
 from satedge_workflow_scheduler.solvers.milp.errors import MilpConfigError
@@ -40,7 +40,7 @@ def test_default_configuration_is_the_plain_hard_model() -> None:
     config = MilpConfig(level=Level.FIXED_DELAY_WINDOWS)
     assert config.deadline is DeadlineMode.HARD
     assert config.reductions is True
-    assert config.plmm_strategy is PlmmStrategy.EAGER
+    assert config.lazy == frozenset()
     assert config.polish is False
     assert config.strengthening == Strengthening()
 
@@ -74,9 +74,9 @@ def test_strengthenings_are_accepted_from_level_four() -> None:
 
 def test_lazy_plmm_needs_the_plmm_level() -> None:
     with pytest.raises(MilpConfigError, match="level 6"):
-        MilpConfig(level=Level.LINK_CONTENTION, plmm_strategy=PlmmStrategy.LAZY)
-    config = MilpConfig(level=Level.PLMM_CAPACITY, plmm_strategy=PlmmStrategy.LAZY)
-    assert config.plmm_strategy is PlmmStrategy.LAZY
+        MilpConfig(level=Level.LINK_CONTENTION, lazy=frozenset({LazyGroup.PLMM}))
+    config = MilpConfig(level=Level.PLMM_CAPACITY, lazy=frozenset({LazyGroup.PLMM}))
+    assert config.lazy == {LazyGroup.PLMM}
 
 
 @pytest.mark.parametrize(
