@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
+from satedge_workflow_scheduler.solvers.milp.blocks.arrival import ArrivalBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.assignment import AssignmentBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.base import ConstraintBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.computing_window import (
@@ -33,6 +34,10 @@ from satedge_workflow_scheduler.solvers.milp.blocks.plmm_occupation import (
 )
 from satedge_workflow_scheduler.solvers.milp.blocks.store_and_forward import (
     StoreAndForwardBlock,
+)
+from satedge_workflow_scheduler.solvers.milp.blocks.strengthening import (
+    ArrivalWithoutBigMBlock,
+    ContactCapacityBlock,
 )
 from satedge_workflow_scheduler.solvers.milp.blocks.tardiness import TardinessBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.task_overlap import TaskOverlapBlock
@@ -58,6 +63,7 @@ _ROUTED_LEVEL: tuple[str, ...] = (
     "task_timing",
     "path",
     "store_and_forward",
+    "arrival",
     "link_window",
     "delivery",
 )
@@ -78,15 +84,19 @@ _PLMM_BLOCKS_OF_FORMULATION: dict[PlmmFormulation, tuple[str, ...]] = {
 formulation itself. The level lists the placeholder ``"plmm"``, which this table expands."""
 
 _STRENGTHENINGS: dict[str, str] = {
-    "arrival_without_big_m": "arrival_without_big_m",
     "contact_capacity": "contact_capacity",
 }
+"""The strengthenings that add a block at the end. Rule 7 replaces the arrival instead: see
+``block_names``."""
 
 IMPLEMENTED: dict[str, type[ConstraintBlock[Any]]] = {
     "assignment": AssignmentBlock,
     "computing_window": ComputingWindowBlock,
     "path": PathBlock,
     "store_and_forward": StoreAndForwardBlock,
+    "arrival": ArrivalBlock,
+    "arrival_without_big_m": ArrivalWithoutBigMBlock,
+    "contact_capacity": ContactCapacityBlock,
     "link_window": LinkWindowBlock,
     "link_contention": LinkContentionBlock,
     "plmm_occupation": PlmmOccupationBlock,
@@ -114,6 +124,10 @@ def block_names(config: MilpConfig) -> tuple[str, ...]:
             names.append(name)
     if config.deadline is DeadlineMode.SOFT:
         names.append("tardiness")
+    if config.strengthening.arrival_without_big_m:
+        names = [
+            "arrival_without_big_m" if name == "arrival" else name for name in names
+        ]
     for flag, name in _STRENGTHENINGS.items():
         if getattr(config.strengthening, flag):
             names.append(name)

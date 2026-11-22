@@ -66,8 +66,11 @@ def test_strengthenings_add_their_blocks_only_when_chosen() -> None:
             ),
         )
     )
-    assert strengthened[: len(plain)] == plain
-    assert strengthened[len(plain) :] == ("arrival_without_big_m", "contact_capacity")
+    # rule 7 replaces the arrival in place, and rule 8 is added at the end
+    replaced = tuple(
+        "arrival_without_big_m" if name == "arrival" else name for name in plain
+    )
+    assert strengthened == (*replaced, "contact_capacity")
 
 
 def test_a_block_without_a_class_is_a_model_error_not_an_omission() -> None:
