@@ -45,3 +45,11 @@ def test_both_requests_are_accepted_with_the_deliveries_of_the_hand_check(
 def test_the_solution_passes_the_independent_checker(solution: Solution) -> None:
     violations = check(sample_instance(), solution, DeadlineMode.HARD)
     assert violations == (), [str(v) for v in violations]
+
+
+def test_the_contention_level_is_solved_and_passes_the_checker() -> None:
+    config = MilpConfig(level=Level.LINK_CONTENTION, deadline=DeadlineMode.HARD)
+    solution = MilpSolver(config, GurobiBackend).solve(sample_instance())
+    assert solution.status is SolveStatus.OPTIMAL
+    violations = check(sample_instance(), solution, DeadlineMode.HARD)
+    assert violations == (), [str(v) for v in violations]
