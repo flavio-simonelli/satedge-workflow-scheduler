@@ -95,6 +95,16 @@ class ModelData:
         )
 
     @property
+    def precedences(self) -> tuple[tuple[TaskKey, TaskKey], ...]:
+        """The precedences ``A`` between consecutive tasks of each new request, ``(i, j)``
+        with ``j`` the task after ``i`` in the pipeline."""
+        return tuple(
+            (TaskKey(rid, k), TaskKey(rid, k + 1))
+            for rid in self.request_ids
+            for k in range(len(self._request(rid).tasks) - 1)
+        )
+
+    @property
     def data(self) -> tuple[DataKey, ...]:
         """The data ``D̄`` of the new requests: the raw data, the intermediate data and the
         final output of each request."""
