@@ -53,3 +53,31 @@ def test_the_contention_level_is_solved_and_passes_the_checker() -> None:
     assert solution.status is SolveStatus.OPTIMAL
     violations = check(sample_instance(), solution, DeadlineMode.HARD)
     assert violations == (), [str(v) for v in violations]
+
+
+def test_the_plmm_level_is_solved_and_passes_the_checker() -> None:
+    config = MilpConfig(level=Level.PLMM_CAPACITY, deadline=DeadlineMode.HARD)
+    solution = MilpSolver(config, GurobiBackend).solve(sample_instance())
+    assert solution.status is SolveStatus.OPTIMAL
+    violations = check(sample_instance(), solution, DeadlineMode.HARD)
+    assert violations == (), [str(v) for v in violations]
+
+
+def test_the_two_plmm_formulations_give_the_same_optimum() -> None:
+    from satedge_workflow_scheduler.solvers.milp.config import PlmmFormulation
+
+    results = {}
+    for formulation in (PlmmFormulation.FLOW, PlmmFormulation.EVENTS):
+        config = MilpConfig(
+            level=Level.PLMM_CAPACITY,
+            deadline=DeadlineMode.HARD,
+            plmm_formulation=formulation,
+        )
+        solution = MilpSolver(config, GurobiBackend).solve(sample_instance())
+        assert solution.status is SolveStatus.OPTIMAL
+        assert check(sample_instance(), solution, DeadlineMode.HARD) == ()
+        results[formulation] = solution.objective
+    flow, events = results[PlmmFormulation.FLOW], results[PlmmFormulation.EVENTS]
+    assert flow is not None and events is not None
+    assert events.primary == pytest.approx(flow.primary)
+    assert events.response == pytest.approx(flow.response)

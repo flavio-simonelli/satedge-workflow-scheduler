@@ -63,6 +63,15 @@ class PlmmStrategy(Enum):
     """They are added only to the satellites that the solution overloads (section 6, rule 10)."""
 
 
+class PlmmFormulation(Enum):
+    """Which formulation of the capacity of the PLMM the model uses (section 6 of the document)."""
+
+    FLOW = "flow"
+    """The flow formulation (FCT): the capacity is a flow between the data that occupy it."""
+    EVENTS = "events"
+    """The event formulation (OOE): the capacity is checked at each event. Not implemented yet."""
+
+
 @dataclass(frozen=True)
 class Strengthening:
     """The optional strengthenings of the model (section 6, rules 7 and 8).
@@ -86,6 +95,8 @@ class MilpConfig:
         reductions: Whether the exact reductions of section 6 (rules 1 to 6) are applied.
         strengthening: The optional strengthenings.
         plmm_strategy: How the PLMM is imposed. Only meaningful from level 6 on.
+        plmm_formulation: Which formulation of the PLMM capacity the model uses. Only meaningful
+            from level 6 on.
         polish: Whether the LP is re-solved with the binaries fixed, to remove the residuals
             of the big-M that the integrality tolerance leaves.
         solve: Parameters of the solver.
@@ -99,6 +110,7 @@ class MilpConfig:
     reductions: bool = True
     strengthening: Strengthening = field(default_factory=Strengthening)
     plmm_strategy: PlmmStrategy = PlmmStrategy.EAGER
+    plmm_formulation: PlmmFormulation = PlmmFormulation.FLOW
     polish: bool = False
     solve: SolveParams = field(default_factory=SolveParams)
 

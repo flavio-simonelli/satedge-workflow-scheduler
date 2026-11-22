@@ -37,7 +37,7 @@ def test_from_routing_on_the_task_timing_replaces_the_fixed_delays() -> None:
     ("level", "added"),
     [
         (Level.LINK_CONTENTION, "link_contention"),
-        (Level.PLMM_CAPACITY, "plmm"),
+        (Level.PLMM_CAPACITY, "plmm_flow"),
         (Level.ONLINE, "online"),
     ],
 )
@@ -84,3 +84,14 @@ def test_blocks_are_instantiated_in_the_order_of_the_level(
     built = blocks_for(MilpConfig(level=Level.ROUTING))
     assert len(built) == len(block_names(MilpConfig(level=Level.ROUTING)))
     assert all(isinstance(b, AssignmentBlock) for b in built)
+
+
+def test_the_plmm_formulation_is_chosen_in_the_config() -> None:
+    from satedge_workflow_scheduler.solvers.milp.config import PlmmFormulation
+
+    flow = block_names(MilpConfig(level=Level.PLMM_CAPACITY))
+    events = block_names(
+        MilpConfig(level=Level.PLMM_CAPACITY, plmm_formulation=PlmmFormulation.EVENTS)
+    )
+    assert "plmm_flow" in flow and "plmm_events" not in flow
+    assert "plmm_events" in events and "plmm_flow" not in events

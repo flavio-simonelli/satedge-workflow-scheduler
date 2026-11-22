@@ -26,13 +26,22 @@ from satedge_workflow_scheduler.solvers.milp.blocks.link_contention import (
 )
 from satedge_workflow_scheduler.solvers.milp.blocks.link_window import LinkWindowBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.path import PathBlock
+from satedge_workflow_scheduler.solvers.milp.blocks.plmm_events import PlmmEventsBlock
+from satedge_workflow_scheduler.solvers.milp.blocks.plmm_flow import PlmmFlowBlock
+from satedge_workflow_scheduler.solvers.milp.blocks.plmm_occupation import (
+    PlmmOccupationBlock,
+)
 from satedge_workflow_scheduler.solvers.milp.blocks.store_and_forward import (
     StoreAndForwardBlock,
 )
 from satedge_workflow_scheduler.solvers.milp.blocks.tardiness import TardinessBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.task_overlap import TaskOverlapBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.task_timing import TaskTimingBlock
-from satedge_workflow_scheduler.solvers.milp.config import Level, MilpConfig
+from satedge_workflow_scheduler.solvers.milp.config import (
+    Level,
+    MilpConfig,
+    PlmmFormulation,
+)
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
 
 _FIXED_DELAY_LEVEL: tuple[str, ...] = (
@@ -61,6 +70,13 @@ _BLOCKS_OF_LEVEL: dict[Level, tuple[str, ...]] = {
     Level.ONLINE: (*_ROUTED_LEVEL, "link_contention", "plmm", "online"),
 }
 
+_PLMM_BLOCKS_OF_FORMULATION: dict[PlmmFormulation, tuple[str, ...]] = {
+    PlmmFormulation.FLOW: ("plmm_occupation", "plmm_flow"),
+    PlmmFormulation.EVENTS: ("plmm_occupation", "plmm_events"),
+}
+"""The blocks of the PLMM capacity of each formulation: the occupations, common to both, and the
+formulation itself. The level lists the placeholder ``"plmm"``, which this table expands."""
+
 _STRENGTHENINGS: dict[str, str] = {
     "arrival_without_big_m": "arrival_without_big_m",
     "contact_capacity": "contact_capacity",
@@ -73,6 +89,9 @@ IMPLEMENTED: dict[str, type[ConstraintBlock[Any]]] = {
     "store_and_forward": StoreAndForwardBlock,
     "link_window": LinkWindowBlock,
     "link_contention": LinkContentionBlock,
+    "plmm_occupation": PlmmOccupationBlock,
+    "plmm_flow": PlmmFlowBlock,
+    "plmm_events": PlmmEventsBlock,
     "delivery": DeliveryBlock,
     "tardiness": TardinessBlock,
     "task_overlap": TaskOverlapBlock,
@@ -87,7 +106,12 @@ def block_names(config: MilpConfig) -> tuple[str, ...]:
     The names are those of the document's levels, and they are returned whether or not the
     block is implemented.
     """
-    names = list(_BLOCKS_OF_LEVEL[config.level])
+    names: list[str] = []
+    for name in _BLOCKS_OF_LEVEL[config.level]:
+        if name == "plmm":
+            names.extend(_PLMM_BLOCKS_OF_FORMULATION[config.plmm_formulation])
+        else:
+            names.append(name)
     if config.deadline is DeadlineMode.SOFT:
         names.append("tardiness")
     for flag, name in _STRENGTHENINGS.items():
