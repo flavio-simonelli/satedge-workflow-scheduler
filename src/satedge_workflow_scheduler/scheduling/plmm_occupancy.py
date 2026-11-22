@@ -7,8 +7,8 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from satedge_workflow_scheduler.common.errors import SolverError
 from satedge_workflow_scheduler.common.intervals import TIME_TOLERANCE
+from satedge_workflow_scheduler.domain.errors import InstanceError
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import Network
 from satedge_workflow_scheduler.domain.nodes import NodeId
@@ -50,7 +50,7 @@ def plmm_intervals(
     holds occupancies. Empty intervals are dropped.
 
     Raises:
-        SolverError: If a data item does not reach the satellite of the task that uses it.
+        InstanceError: If a data item does not reach the satellite of the task that uses it.
             The final output is not checked here: its chain is not required to end at the
             ground station.
     """
@@ -86,7 +86,7 @@ def plmm_intervals(
             # data item k is the input of task k; the last one is the final output
             if data_index < len(request.tasks):
                 if node != tasks_done[data_index].satellite:
-                    raise SolverError(
+                    raise InstanceError(
                         f"request {request.id}: data {data_index} does not reach "
                         f"the satellite of task {data_index} ({node!r} instead)"
                     )

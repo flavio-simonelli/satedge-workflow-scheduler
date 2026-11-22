@@ -4,7 +4,6 @@ from collections.abc import Callable
 
 import pytest
 
-from satedge_workflow_scheduler.common.errors import InfeasibleModelError
 from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import (
@@ -17,6 +16,7 @@ from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
 from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
 from satedge_workflow_scheduler.domain.solution import Solution
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
+from satedge_workflow_scheduler.solvers.errors import InfeasibleModelError
 from satedge_workflow_scheduler.solvers.priority_edf_eft import PriorityEdfEftSolver
 
 U, N = Priority.URGENT, Priority.NON_URGENT

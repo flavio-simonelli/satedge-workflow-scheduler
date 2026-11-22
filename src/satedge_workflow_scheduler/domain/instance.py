@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 
-from satedge_workflow_scheduler.common.errors import InstanceError
+from satedge_workflow_scheduler.domain.errors import InstanceError
 from satedge_workflow_scheduler.domain.network import Network
 from satedge_workflow_scheduler.domain.nodes import NodeId
 from satedge_workflow_scheduler.domain.requests import Request

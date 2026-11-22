@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from satedge_workflow_scheduler.common.errors import InstanceError, SolverError
 from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
+from satedge_workflow_scheduler.domain.errors import InstanceError
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
@@ -119,7 +119,7 @@ def test_soft_objective_is_weighted_tardiness() -> None:
 
 def test_evaluate_rejects_unknown_request() -> None:
     instance = _instance((_request("n", N, 50.0),))
-    with pytest.raises(SolverError):
+    with pytest.raises(InstanceError):
         evaluate(instance, [RequestOutcome("ghost", False)], DeadlineMode.HARD)
 
 

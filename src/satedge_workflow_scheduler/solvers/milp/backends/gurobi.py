@@ -12,7 +12,7 @@ from collections.abc import Iterable, Mapping
 from types import ModuleType
 from typing import Any
 
-from satedge_workflow_scheduler.common.errors import SolverError
+from satedge_workflow_scheduler.solvers.errors import SolverError
 from satedge_workflow_scheduler.solvers.milp.backends.ports import (
     BackendStatus,
     SolveParams,

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from satedge_workflow_scheduler.common.errors import InstanceError
 from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
+from satedge_workflow_scheduler.domain.errors import InstanceError
 from satedge_workflow_scheduler.domain.network import (
     Arc,
     Network,

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from satedge_workflow_scheduler.common.errors import InfeasibleModelError
 from satedge_workflow_scheduler.common.intervals import TIME_TOLERANCE
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.nodes import NodeId
@@ -20,6 +19,7 @@ from satedge_workflow_scheduler.domain.solution import (
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
 from satedge_workflow_scheduler.scheduling.objective import evaluate
 from satedge_workflow_scheduler.scheduling.plmm_occupancy import PlmmOccupancyInterval
+from satedge_workflow_scheduler.solvers.errors import InfeasibleModelError
 from satedge_workflow_scheduler.solvers.priority_edf_eft.ledger import ResourceLedger
 from satedge_workflow_scheduler.solvers.priority_edf_eft.ordering import (
     PriorityEdfOrdering,

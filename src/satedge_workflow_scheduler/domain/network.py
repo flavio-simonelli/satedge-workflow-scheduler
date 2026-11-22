@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import cached_property
 
-from satedge_workflow_scheduler.common.errors import InstanceError
 from satedge_workflow_scheduler.common.intervals import WindowSet
+from satedge_workflow_scheduler.domain.errors import InstanceError
 from satedge_workflow_scheduler.domain.nodes import GroundStation, NodeId, Satellite
 
 

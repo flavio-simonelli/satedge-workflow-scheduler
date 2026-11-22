@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
 
-from satedge_workflow_scheduler.common.errors import InstanceError
+from satedge_workflow_scheduler.domain.errors import InstanceError
 from satedge_workflow_scheduler.domain.nodes import NodeId
 
 

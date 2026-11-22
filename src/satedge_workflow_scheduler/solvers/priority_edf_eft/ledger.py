@@ -16,11 +16,11 @@ from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-from satedge_workflow_scheduler.common.errors import SolverError
 from satedge_workflow_scheduler.common.intervals import BusyTimeline, TimeWindow
 from satedge_workflow_scheduler.domain.network import Network
 from satedge_workflow_scheduler.domain.nodes import NodeId
 from satedge_workflow_scheduler.scheduling.plmm_occupancy import PlmmOccupancyInterval
+from satedge_workflow_scheduler.solvers.errors import SolverError
 
 
 @dataclass(frozen=True, slots=True)

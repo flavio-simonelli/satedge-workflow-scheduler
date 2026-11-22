@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from satedge_workflow_scheduler.common.errors import SolverError
 from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
@@ -12,6 +11,7 @@ from satedge_workflow_scheduler.domain.network import (
 )
 from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
 from satedge_workflow_scheduler.scheduling.plmm_occupancy import PlmmOccupancyInterval
+from satedge_workflow_scheduler.solvers.errors import SolverError
 from satedge_workflow_scheduler.solvers.priority_edf_eft.ledger import (
     ArcKey,
     HpcKey,

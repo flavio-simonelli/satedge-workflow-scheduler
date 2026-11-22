@@ -4,8 +4,8 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from satedge_workflow_scheduler.common.errors import SolverError
 from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
+from satedge_workflow_scheduler.domain.errors import InstanceError
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import (
     AlwaysAvailable,
@@ -127,7 +127,7 @@ def test_data_not_reaching_its_task_satellite_is_an_error() -> None:
     executions = [TaskExecution("r", 0, "S2", start=10.0, end=20.0)]
     transfers = [Transfer("r", 1, "S2", "G", start=20.0, end=23.0)]
 
-    with pytest.raises(SolverError):
+    with pytest.raises(InstanceError):
         plmm_intervals(instance, executions, transfers)
 
 
