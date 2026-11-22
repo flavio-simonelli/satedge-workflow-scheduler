@@ -263,6 +263,7 @@ class ModelData:
         return self._instance.release_of(satellite)
 
     @property
+    @property
     def epsilon(self) -> float:
         """``ε``: weight of the response time in the objective (1′) and (1″)."""
         return response_epsilon(self._instance.requests)
