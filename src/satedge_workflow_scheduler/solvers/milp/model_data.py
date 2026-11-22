@@ -109,6 +109,18 @@ class ModelData:
         )
 
     @property
+    def link_pairs(self) -> tuple[tuple[DataKey, DataKey], ...]:
+        """The pairs ``Q^link`` of data of different requests, ``(a, b)`` with ``a`` before ``b``
+        in the order of :attr:`data`: each pair appears once."""
+        data = self.data
+        return tuple(
+            (a, b)
+            for k, a in enumerate(data)
+            for b in data[k + 1 :]
+            if a.request_id != b.request_id
+        )
+
+    @property
     def precedences(self) -> tuple[tuple[TaskKey, TaskKey], ...]:
         """The precedences ``A`` between consecutive tasks of each new request, ``(i, j)``
         with ``j`` the task after ``i`` in the pipeline."""
@@ -263,6 +275,15 @@ class ModelData:
         return self._instance.release_of(satellite)
 
     @property
+    def plmm_big_m(self) -> float:
+        """``M^P = max_r τ̂_r + max_i L̄_i + max_{a,e} D_{a,e} + max_e λ_e``: the big-M of the PLMM."""
+        return (
+            max(self.limit(r) for r in self.request_ids)
+            + max(self.duration(i, s) for i in self.tasks for s in self.satellites)
+            + max(self.transmission_time(a, e) for a in self.data for e in self.arc_ids)
+            + max(self.latency(e) for e in self.arc_ids)
+        )
+
     @property
     def epsilon(self) -> float:
         """``ε``: weight of the response time in the objective (1′) and (1″)."""
