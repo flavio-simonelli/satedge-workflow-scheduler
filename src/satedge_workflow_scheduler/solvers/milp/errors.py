@@ -12,3 +12,7 @@ from satedge_workflow_scheduler.common.errors import SchedulerError
 
 class ModelBuildError(SchedulerError):
     """The model cannot be built: a declaration is inconsistent with the rest of the model."""
+
+
+class MilpConfigError(SchedulerError):
+    """A configuration of the MILP asks for something that is not a valid model."""
