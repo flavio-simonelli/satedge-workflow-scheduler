@@ -19,6 +19,7 @@ from satedge_workflow_scheduler.solvers.milp.blocks.base import ConstraintBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.computing_window import (
     ComputingWindowBlock,
 )
+from satedge_workflow_scheduler.solvers.milp.blocks.path import PathBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.task_overlap import TaskOverlapBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.task_timing import TaskTimingBlock
 from satedge_workflow_scheduler.solvers.milp.config import Level, MilpConfig
@@ -58,6 +59,7 @@ _STRENGTHENINGS: dict[str, str] = {
 IMPLEMENTED: dict[str, type[ConstraintBlock[Any]]] = {
     "assignment": AssignmentBlock,
     "computing_window": ComputingWindowBlock,
+    "path": PathBlock,
     "task_overlap": TaskOverlapBlock,
     "task_timing": TaskTimingBlock,
 }

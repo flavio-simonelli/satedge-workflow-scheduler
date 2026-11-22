@@ -60,7 +60,8 @@ class ModelBuilder:
                 that no decision variable and no earlier block provides.
         """
         _check_formulation(blocks)
-        variables = create_decision_variables(self._sink, self._data)
+        requested = frozenset(family for block in blocks for family in block.requires)
+        variables = create_decision_variables(self._sink, self._data, requested)
         context = BuildContext(self._data, variables)
 
         rows: dict[str, int] = {}
