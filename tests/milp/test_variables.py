@@ -8,6 +8,7 @@ from sample import sample_instance
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
 from satedge_workflow_scheduler.solvers.milp.backends.fake_recording import (
     FakeRecordingBackend,
+    RecordedVar,
 )
 from satedge_workflow_scheduler.solvers.milp.backends.ports import VarKind
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
@@ -24,7 +25,7 @@ def _create(mode: DeadlineMode) -> tuple[FakeRecordingBackend, DecisionVariables
     return backend, variables
 
 
-def _by_name(backend: FakeRecordingBackend, prefix: str) -> list:
+def _by_name(backend: FakeRecordingBackend, prefix: str) -> list[RecordedVar]:
     return [v for v in backend.variables if v.name.startswith(prefix)]
 
 
@@ -78,7 +79,8 @@ def test_start_of_a_task_is_bounded_by_its_limit_minus_its_fastest_run() -> None
     # r1.0 lasts 15 s on either satellite and r1 must be delivered by 500 s
     start = backend.variables[variables.t(TaskKey("r1", 0))]
     assert start.kind is VarKind.CONTINUOUS
-    assert (start.lb, start.ub) == (0.0, pytest.approx(485.0))
+    assert start.lb == 0.0
+    assert start.ub == pytest.approx(485.0)
 
 
 def test_soft_deadlines_bound_the_start_by_the_horizon() -> None:

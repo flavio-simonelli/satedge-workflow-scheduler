@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Sequence
+
 import pytest
 from sample import sample_instance
 
@@ -15,7 +17,7 @@ from satedge_workflow_scheduler.solvers.milp.blocks.base import (
     ConstraintBlock,
 )
 from satedge_workflow_scheduler.solvers.milp.blocks.task_timing import TaskTimingBlock
-from satedge_workflow_scheduler.solvers.milp.expr import Sense
+from satedge_workflow_scheduler.solvers.milp.expr import Row, Sense
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData, TaskKey
 from satedge_workflow_scheduler.solvers.milp.variables import create_decision_variables
 
@@ -27,7 +29,7 @@ def _context(mode: DeadlineMode) -> tuple[BuildContext, FakeRecordingBackend]:
     return BuildContext(data, variables), backend
 
 
-def _row(rows, name):
+def _row(rows: Sequence[Row], name: str) -> Row:
     (row,) = [r for r in rows if r.name == name]
     return row
 
@@ -42,7 +44,9 @@ def test_a_block_must_declare_its_name_equations_and_families() -> None:
             name = "incomplete"
             requires = frozenset()
 
-            def rows(self, ctx):  # pragma: no cover - the class is never built
+            def rows(
+                self, ctx: BuildContext, aux: None
+            ) -> Iterator[Row]:  # pragma: no cover - never built
                 return iter(())
 
 
