@@ -18,6 +18,7 @@ from satedge_workflow_scheduler.solvers.milp.blocks.base import (
     BuildContext,
     ConstraintBlock,
 )
+from satedge_workflow_scheduler.solvers.milp.blocks.terms import busy_time
 from satedge_workflow_scheduler.solvers.milp.expr import LinExpr, Row
 from satedge_workflow_scheduler.solvers.milp.model_data import TaskKey
 
@@ -29,7 +30,7 @@ class TaskTimingBlock(ConstraintBlock):
     equations = "(3), (4)"
     requires = frozenset({"rejection", "t", "u"})
 
-    def rows(self, ctx: BuildContext) -> Iterator[Row]:
+    def rows(self, ctx: BuildContext, aux: None) -> Iterator[Row]:
         yield from self._precedences(ctx)
         yield from self._releases(ctx)
 
@@ -37,9 +38,7 @@ class TaskTimingBlock(ConstraintBlock):
         variables = ctx.variables
         for i, j in ctx.data.precedences:
             # t_j − t_i − Σ_s L̄_{i,s} x_{i,s} ≥ 0
-            busy = LinExpr.total(
-                ctx.data.duration(i, s) * variables.x(i, s) for s in ctx.data.satellites
-            )
+            busy = busy_time(ctx, i)
             yield (
                 LinExpr.var(variables.t(j)) - LinExpr.var(variables.t(i)) - busy >= 0
             ).named(f"precedence[{i},{j}]")

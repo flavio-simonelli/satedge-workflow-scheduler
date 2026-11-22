@@ -12,8 +12,14 @@ error, not a silent omission: a model without a block is a different model.
 
 from __future__ import annotations
 
+from typing import Any
+
 from satedge_workflow_scheduler.solvers.milp.blocks.assignment import AssignmentBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.base import ConstraintBlock
+from satedge_workflow_scheduler.solvers.milp.blocks.computing_window import (
+    ComputingWindowBlock,
+)
+from satedge_workflow_scheduler.solvers.milp.blocks.task_overlap import TaskOverlapBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.task_timing import TaskTimingBlock
 from satedge_workflow_scheduler.solvers.milp.config import Level, MilpConfig
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
@@ -49,8 +55,10 @@ _STRENGTHENINGS: dict[str, str] = {
     "contact_capacity": "contact_capacity",
 }
 
-IMPLEMENTED: dict[str, type[ConstraintBlock]] = {
+IMPLEMENTED: dict[str, type[ConstraintBlock[Any]]] = {
     "assignment": AssignmentBlock,
+    "computing_window": ComputingWindowBlock,
+    "task_overlap": TaskOverlapBlock,
     "task_timing": TaskTimingBlock,
 }
 """The blocks with a class. Each block is registered here when it is written."""

@@ -23,7 +23,7 @@ class AssignmentBlock(ConstraintBlock):
     equations = "(2)"
     requires = frozenset({"rejection", "u"})
 
-    def rows(self, ctx: BuildContext) -> Iterator[Row]:
+    def rows(self, ctx: BuildContext, aux: None) -> Iterator[Row]:
         variables = ctx.variables
         for i in ctx.data.tasks:
             placed = LinExpr.total(variables.x(i, s) for s in ctx.data.satellites)

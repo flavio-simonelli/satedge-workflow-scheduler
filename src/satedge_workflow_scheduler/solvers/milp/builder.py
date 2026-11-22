@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from satedge_workflow_scheduler.solvers.milp.backends.ports import ModelSink
 from satedge_workflow_scheduler.solvers.milp.blocks.base import (
@@ -51,7 +52,7 @@ class ModelBuilder:
         self._data = data
         self._sink = sink
 
-    def build(self, blocks: Sequence[ConstraintBlock]) -> BuiltModel:
+    def build(self, blocks: Sequence[ConstraintBlock[Any]]) -> BuiltModel:
         """Check the blocks, then write them in order.
 
         Raises:
@@ -68,7 +69,7 @@ class ModelBuilder:
         return BuiltModel(variables, rows)
 
 
-def _check_formulation(blocks: Sequence[ConstraintBlock]) -> None:
+def _check_formulation(blocks: Sequence[ConstraintBlock[Any]]) -> None:
     """The consistency of a formulation, checked before anything is written."""
     names = [block.name for block in blocks]
     repeated = sorted({n for n in names if names.count(n) > 1})

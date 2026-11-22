@@ -95,6 +95,19 @@ class ModelData:
         )
 
     @property
+    def task_pairs(self) -> tuple[tuple[TaskKey, TaskKey], ...]:
+        """The pairs ``Q`` of tasks of different requests, ``(i, j)`` with ``i`` before ``j``.
+
+        Tasks of the same request do not overlap: the precedences order them."""
+        tasks = self.tasks
+        return tuple(
+            (i, j)
+            for a, i in enumerate(tasks)
+            for j in tasks[a + 1 :]
+            if i.request_id != j.request_id
+        )
+
+    @property
     def precedences(self) -> tuple[tuple[TaskKey, TaskKey], ...]:
         """The precedences ``A`` between consecutive tasks of each new request, ``(i, j)``
         with ``j`` the task after ``i`` in the pipeline."""

@@ -11,7 +11,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import ClassVar, final
+from typing import ClassVar, cast, final
 
 from satedge_workflow_scheduler.solvers.milp.backends.ports import ModelSink
 from satedge_workflow_scheduler.solvers.milp.expr import Row
@@ -32,7 +32,7 @@ class BuildContext:
     variables: DecisionVariables
 
 
-class ConstraintBlock(ABC):
+class ConstraintBlock[A = None](ABC):
     """One family of constraints of the document.
 
     Subclasses set the class attributes below and implement :meth:`rows`.
@@ -58,13 +58,18 @@ class ConstraintBlock(ABC):
                     f"{cls.__name__} must define the attribute {attribute!r}"
                 )
 
+    def variables(self, ctx: BuildContext, sink: ModelSink) -> A:
+        """Create the auxiliary variables of the block, before its rows. By default, none."""
+        return cast(A, None)
+
     @abstractmethod
-    def rows(self, ctx: BuildContext) -> Iterator[Row]:
-        """The rows of the block, in order. Each row is named after its key in the model."""
+    def rows(self, ctx: BuildContext, aux: A) -> Iterator[Row]:
+        """The rows of the block, in order, given the auxiliary variables it created."""
 
     @final
     def build(self, ctx: BuildContext, sink: ModelSink) -> int:
-        """Write the rows of the block to ``sink``, and return how many there are."""
-        rows = list(self.rows(ctx))
+        """Create the auxiliary variables, write the rows to ``sink``, and return how many."""
+        aux = self.variables(ctx, sink)
+        rows = list(self.rows(ctx, aux))
         sink.add_rows(rows)
         return len(rows)

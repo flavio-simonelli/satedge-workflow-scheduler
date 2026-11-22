@@ -30,10 +30,10 @@ def _block(
 ) -> ConstraintBlock:
     """A block that writes nothing: only its declarations matter to the builder."""
 
-    def rows(self: ConstraintBlock, ctx: BuildContext) -> Iterator[Row]:
+    def rows(self: ConstraintBlock, ctx: BuildContext, aux: None) -> Iterator[Row]:
         return iter(())
 
-    cls = type(
+    cls: type[ConstraintBlock] = type(
         f"Block_{name}",
         (ConstraintBlock,),
         {
@@ -105,3 +105,17 @@ def test_the_decision_families_are_available_to_every_block() -> None:
         [_block("reader", requires=frozenset({"t", "u"}))]
     )
     assert built.rows == {"reader": 0}
+
+
+def test_the_overlap_block_provides_the_order_and_same_families() -> None:
+    from satedge_workflow_scheduler.solvers.milp.blocks.task_overlap import (
+        TaskOverlapBlock,
+    )
+
+    overlap = TaskOverlapBlock()
+    assert {"same", "order"} <= overlap.provides
+    reader = _block("reader", requires=frozenset({"order"}))
+    backend = FakeRecordingBackend()
+    ModelBuilder(_data(), backend).build([overlap, reader])  # no error: provided before
+    with pytest.raises(ModelBuildError, match="reader"):
+        ModelBuilder(_data(), FakeRecordingBackend()).build([reader, overlap])
