@@ -16,6 +16,7 @@ from satedge_workflow_scheduler.solvers.milp.backends.ports import ModelSink
 from satedge_workflow_scheduler.solvers.milp.blocks.base import (
     BuildContext,
     ConstraintBlock,
+    Families,
 )
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
@@ -34,10 +35,12 @@ class BuiltModel:
         variables: The decision variables, shared by the blocks.
         rows: Number of rows written by each block, keyed by the name of the block, in the
             order the blocks were built.
+        families: The auxiliary variables created by the blocks, by type.
     """
 
     variables: DecisionVariables
     rows: Mapping[str, int] = field(default_factory=dict)
+    families: Families = field(default_factory=Families)
 
 
 class ModelBuilder:
@@ -60,14 +63,14 @@ class ModelBuilder:
                 that no decision variable and no earlier block provides.
         """
         _check_formulation(blocks)
-        requested = frozenset(family for block in blocks for family in block.requires)
-        variables = create_decision_variables(self._sink, self._data, requested)
-        context = BuildContext(self._data, variables)
+        variables = create_decision_variables(self._sink, self._data)
+        families = Families()
+        context = BuildContext(self._data, variables, families)
 
         rows: dict[str, int] = {}
         for block in blocks:
             rows[block.name] = block.build(context, self._sink)
-        return BuiltModel(variables, rows)
+        return BuiltModel(variables, rows, families)
 
 
 def _check_formulation(blocks: Sequence[ConstraintBlock[Any]]) -> None:

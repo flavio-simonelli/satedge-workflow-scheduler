@@ -12,11 +12,7 @@ from satedge_workflow_scheduler.solvers.milp.backends.fake_recording import (
 )
 from satedge_workflow_scheduler.solvers.milp.backends.ports import VarKind
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
-from satedge_workflow_scheduler.solvers.milp.model_data import (
-    DataKey,
-    ModelData,
-    TaskKey,
-)
+from satedge_workflow_scheduler.solvers.milp.model_data import ModelData, TaskKey
 from satedge_workflow_scheduler.solvers.milp.variables import (
     DecisionVariables,
     create_decision_variables,
@@ -40,12 +36,13 @@ def test_each_family_has_one_variable_per_index() -> None:
     assert _by_name(backend, "x[") == []  # x is an expression of the u, not a variable
     assert len(_by_name(backend, "t[")) == 3
     assert len(_by_name(backend, "u[")) == 3 * 2 * 1
-    # 5 data on the 2 arcs always available, and on the windowed arc S2→G, one window each
-    assert len(_by_name(backend, "chi[")) == 5 * 2
-    assert len(_by_name(backend, "nu[")) == 5 * 1
-    # ξ on all 3 arcs for the 5 data
-    assert len(_by_name(backend, "xi[")) == 5 * 3
-    assert len(backend.variables) == 2 + 3 + 6 + 5 * 2 + 5 * 1 + 5 * 3
+    assert len(backend.variables) == 2 + 3 + 6
+
+
+def test_the_auxiliary_families_are_not_created_with_the_decision_variables() -> None:
+    backend, _ = _create(DeadlineMode.HARD)
+    for prefix in ("chi[", "nu[", "xi[", "deliv[", "tard["):
+        assert _by_name(backend, prefix) == []
 
 
 def test_handles_are_consecutive_and_match_the_recorded_variables() -> None:
@@ -110,19 +107,3 @@ def test_a_missing_variable_is_a_model_error() -> None:
         variables.x(TaskKey("r9", 0), "S1")
     with pytest.raises(ModelBuildError, match="does not exist"):
         variables.u(TaskKey("r1", 0), "S1", 5)
-
-
-def test_routing_variables_exist_only_when_requested() -> None:
-    backend = FakeRecordingBackend()
-    data = ModelData(sample_instance(), DeadlineMode.HARD)
-    create_decision_variables(backend, data, frozenset({"u"}))
-    assert _by_name(backend, "chi[") == []
-    assert _by_name(backend, "nu[") == []
-
-
-def test_chi_on_a_windowed_arc_is_the_sum_of_its_windows() -> None:
-    _, variables = _create(DeadlineMode.HARD)
-    raw = DataKey("r1", 0)
-    # arc 2 is S2→G, with visibility windows: χ is the expression Σ_h nu, with no χ variable
-    assert (raw, 2) not in variables.arc_chi
-    assert variables.chi(raw, 2).terms == {variables.nu(raw, 2, 0): 1.0}

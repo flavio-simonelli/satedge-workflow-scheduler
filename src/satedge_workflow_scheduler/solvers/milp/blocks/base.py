@@ -1,22 +1,51 @@
 """The base of the constraint blocks: the rows of a block, and the way they reach the model.
 
 A block is a class with a name, the equations of the document it writes, and the families of
-variables it needs. Its only method to write is :meth:`ConstraintBlock.rows`, which returns the
-rows; the template method :meth:`ConstraintBlock.build` writes them to the sink and counts
-them, the same way for every block. The sink is the only thing a block can write to.
+variables it needs and provides. It writes its rows through :meth:`ConstraintBlock.rows`, and it
+may create variables first, in :meth:`ConstraintBlock.variables`. The template method
+:meth:`ConstraintBlock.build` runs both, in order, and registers the variables in
+:class:`Families`, so that the blocks that follow can read them by their type.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import ClassVar, cast, final
 
 from satedge_workflow_scheduler.solvers.milp.backends.ports import ModelSink
+from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
 from satedge_workflow_scheduler.solvers.milp.expr import Row
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
 from satedge_workflow_scheduler.solvers.milp.variables import DecisionVariables
+
+
+class Families:
+    """The auxiliary variables that the blocks created so far, by the type of their container.
+
+    A block that creates variables that other blocks read returns them, in a container, from
+    :meth:`ConstraintBlock.variables`. The template method registers the container here, and a
+    later block gets it back by its type. Asking for a container that no earlier block created is
+    an error, so the order of the formulation is checked when it is built.
+    """
+
+    def __init__(self) -> None:
+        self._containers: dict[type, object] = {}
+
+    def add(self, container: object) -> None:
+        """Register the container of a block, under its type."""
+        self._containers[type(container)] = container
+
+    def get[T](self, kind: type[T]) -> T:
+        """The container of type ``kind``, created by an earlier block.
+
+        Raises:
+            ModelBuildError: If no earlier block created it.
+        """
+        if kind not in self._containers:
+            raise ModelBuildError(f"no earlier block created {kind.__name__}")
+        return cast(T, self._containers[kind])
 
 
 @dataclass(frozen=True)
@@ -26,10 +55,12 @@ class BuildContext:
     Attributes:
         data: The data of the model, in the notation of the document.
         variables: The decision variables, shared by the blocks.
+        families: The auxiliary variables created by the earlier blocks.
     """
 
     data: ModelData
     variables: DecisionVariables
+    families: Families = field(default_factory=Families)
 
 
 class ConstraintBlock[A = None](ABC):
@@ -68,8 +99,10 @@ class ConstraintBlock[A = None](ABC):
 
     @final
     def build(self, ctx: BuildContext, sink: ModelSink) -> int:
-        """Create the auxiliary variables, write the rows to ``sink``, and return how many."""
+        """Create the auxiliary variables, register them, write the rows, and return how many."""
         aux = self.variables(ctx, sink)
+        if aux is not None:
+            ctx.families.add(aux)
         rows = list(self.rows(ctx, aux))
         sink.add_rows(rows)
         return len(rows)

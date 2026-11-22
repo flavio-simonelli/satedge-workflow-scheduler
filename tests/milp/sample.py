@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any
+
 from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import (
@@ -13,6 +17,17 @@ from satedge_workflow_scheduler.domain.network import (
 )
 from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
 from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
+from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
+from satedge_workflow_scheduler.solvers.milp.backends.fake_recording import (
+    FakeRecordingBackend,
+)
+from satedge_workflow_scheduler.solvers.milp.blocks.base import (
+    BuildContext,
+    ConstraintBlock,
+)
+from satedge_workflow_scheduler.solvers.milp.builder import BuiltModel, ModelBuilder
+from satedge_workflow_scheduler.solvers.milp.expr import Row
+from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
 
 HORIZON = 600.0
 
@@ -69,3 +84,26 @@ def sample_instance() -> ProblemInstance:
         horizon=HORIZON,
         plan_release={"S1": 0.0, "S2": 0.0},
     )
+
+
+@dataclass(frozen=True)
+class Built:
+    """A model built from some blocks, with the context to read its handles and rows."""
+
+    ctx: BuildContext
+    backend: FakeRecordingBackend
+    model: BuiltModel
+
+    def row(self, name: str) -> Row:
+        (row,) = [r for r in self.backend.rows if r.name == name]
+        return row
+
+
+def build(
+    blocks: Sequence[ConstraintBlock[Any]], mode: DeadlineMode = DeadlineMode.HARD
+) -> Built:
+    """Build ``blocks`` on the sample instance, in order, through the builder."""
+    data = ModelData(sample_instance(), mode)
+    backend = FakeRecordingBackend()
+    model = ModelBuilder(data, backend).build(blocks)
+    return Built(BuildContext(data, model.variables, model.families), backend, model)

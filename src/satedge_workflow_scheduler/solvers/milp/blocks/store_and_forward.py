@@ -1,8 +1,9 @@
 """When each transmission starts: after the production, store-and-forward, and the arrival.
 
 Equations (14a)–(16b) of the document. The variable ``ξ_{a,e}`` is the start of the transmission
-of the data ``a`` on the arc ``e``, and ``χ_{a,e}`` says whether ``a`` crosses ``e`` at all: the
-constraints of an arc not crossed are relaxed by the big-M, so they do not bind.
+of the data ``a`` on the arc ``e``, and the block creates it. ``χ_{a,e}`` says whether ``a``
+crosses ``e`` at all, and it comes from the path block: the constraints of an arc not crossed
+are relaxed by the big-M, so they do not bind.
 
 - (14a): a transmission starts after the producer has finished, if the data leaves through the
   arc. The producer occupies its HPC for ``Σ_s L̄_{i,s} x_{i,s}``, which is ``L̄_i (1 − ρ_r)``.
@@ -18,42 +19,80 @@ The time of an arc is ``D_{a,e} + λ_e``: the transmission plus the latency. The
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
+from dataclasses import dataclass
 
+from satedge_workflow_scheduler.solvers.milp.backends.ports import ModelSink, VarKind
 from satedge_workflow_scheduler.solvers.milp.blocks.base import (
     BuildContext,
     ConstraintBlock,
 )
+from satedge_workflow_scheduler.solvers.milp.blocks.path import RoutingVariables
 from satedge_workflow_scheduler.solvers.milp.blocks.terms import busy_time
-from satedge_workflow_scheduler.solvers.milp.expr import LinExpr, Row
-from satedge_workflow_scheduler.solvers.milp.model_data import DataKey
+from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
+from satedge_workflow_scheduler.solvers.milp.expr import LinExpr, Row, Var
+from satedge_workflow_scheduler.solvers.milp.model_data import ArcId, DataKey
 
 
-class StoreAndForwardBlock(ConstraintBlock):
+@dataclass(frozen=True)
+class TransmissionStarts:
+    """``ξ_{a,e}``: the start of the transmission of the data ``a`` on the arc ``e``."""
+
+    start: Mapping[tuple[DataKey, ArcId], Var]
+
+    def xi(self, a: DataKey, arc: ArcId) -> Var:
+        try:
+            return self.start[(a, arc)]
+        except KeyError:
+            raise ModelBuildError(f"variable xi[{a},{arc}] does not exist") from None
+
+
+class StoreAndForwardBlock(ConstraintBlock[TransmissionStarts]):
     """Start of the transmissions (14a)–(14b), store-and-forward (15), arrival (16a) and
     delivery to the ground station before the limit (16b)."""
 
     name = "store and forward"
     equations = "(14a)-(16b)"
-    requires = frozenset({"rejection", "t", "u", "chi", "xi"})
+    requires = frozenset({"rejection", "t", "u", "chi"})
+    provides = frozenset({"xi"})
 
-    def rows(self, ctx: BuildContext, aux: None) -> Iterator[Row]:
+    def variables(self, ctx: BuildContext, sink: ModelSink) -> TransmissionStarts:
+        start: dict[tuple[DataKey, ArcId], Var] = {}
+        for a in ctx.data.data:
+            for e in ctx.data.arc_ids:
+                # ξ_{a,e} ∈ [0, τ̂_r]: the transmission starts before the limit of its request
+                start[(a, e)] = sink.add_var(
+                    0.0,
+                    ctx.data.limit(a.request_id),
+                    VarKind.CONTINUOUS,
+                    f"xi[{a},{e}]",
+                )
+        return TransmissionStarts(start)
+
+    def rows(self, ctx: BuildContext, aux: TransmissionStarts) -> Iterator[Row]:
+        routing = ctx.families.get(RoutingVariables)
         data = ctx.data
         for a in data.data:
-            yield from self._start_after_production(ctx, a)
+            yield from self._start_after_production(ctx, aux, routing, a)
         for a in data.data:
-            yield from self._store_and_forward(ctx, a)
+            yield from self._store_and_forward(ctx, aux, routing, a)
         for a in data.data:
-            yield from self._arrival_at_consumer(ctx, a)
+            yield from self._arrival_at_consumer(ctx, aux, routing, a)
         for a in data.data:
-            yield from self._delivery_before_limit(ctx, a)
+            yield from self._delivery_before_limit(ctx, aux, routing, a)
 
-    def _start_after_production(self, ctx: BuildContext, a: DataKey) -> Iterator[Row]:
+    def _start_after_production(
+        self,
+        ctx: BuildContext,
+        starts: TransmissionStarts,
+        routing: RoutingVariables,
+        a: DataKey,
+    ) -> Iterator[Row]:
         data, variables = ctx.data, ctx.variables
         producer = data.producer(a)
         for e in data.arc_ids:
-            xi = LinExpr.var(variables.xi(a, e))
-            chi = variables.chi(a, e)
+            xi = LinExpr.var(starts.xi(a, e))
+            chi = routing.chi(a, e)
             if producer is None:
                 # (14b) ξ_{a,e} ≥ b_r · χ_{a,e}
                 rel = data.release(a.request_id)
@@ -69,23 +108,35 @@ class StoreAndForwardBlock(ConstraintBlock):
                     >= 0
                 ).named(f"after-producer[{a},{e}]")
 
-    def _store_and_forward(self, ctx: BuildContext, a: DataKey) -> Iterator[Row]:
+    def _store_and_forward(
+        self,
+        ctx: BuildContext,
+        starts: TransmissionStarts,
+        routing: RoutingVariables,
+        a: DataKey,
+    ) -> Iterator[Row]:
         # (15) ξ_{a,e'} ≥ ξ_{a,e} + D_{a,e} + λ_e − M(2 − χ_{a,e} − χ_{a,e'})
-        data, variables = ctx.data, ctx.variables
+        data = ctx.data
         for v in data.satellites:
             for e in data.incoming(v):
                 time_e = data.transmission_time(a, e) + data.latency(e)
                 big_m = data.limit(a.request_id) + time_e
                 for e_next in data.outgoing(v):
                     yield (
-                        LinExpr.var(variables.xi(a, e_next))
-                        - LinExpr.var(variables.xi(a, e))
+                        LinExpr.var(starts.xi(a, e_next))
+                        - LinExpr.var(starts.xi(a, e))
                         - time_e
-                        + big_m * (2 - variables.chi(a, e) - variables.chi(a, e_next))
+                        + big_m * (2 - routing.chi(a, e) - routing.chi(a, e_next))
                         >= 0
                     ).named(f"store[{a},{e},{e_next}]")
 
-    def _arrival_at_consumer(self, ctx: BuildContext, a: DataKey) -> Iterator[Row]:
+    def _arrival_at_consumer(
+        self,
+        ctx: BuildContext,
+        starts: TransmissionStarts,
+        routing: RoutingVariables,
+        a: DataKey,
+    ) -> Iterator[Row]:
         # (16a) t_j ≥ ξ_{a,e} + D_{a,e} + λ_e − M(2 − χ_{a,e} − x_{j,v}), for v satellite, e into v
         data, variables = ctx.data, ctx.variables
         consumer = data.consumer(a)
@@ -97,15 +148,21 @@ class StoreAndForwardBlock(ConstraintBlock):
                 big_m = data.limit(a.request_id) + time_e
                 yield (
                     LinExpr.var(variables.t(consumer))
-                    - LinExpr.var(variables.xi(a, e))
+                    - LinExpr.var(starts.xi(a, e))
                     - time_e
-                    + big_m * (2 - variables.chi(a, e) - variables.x(consumer, v))
+                    + big_m * (2 - routing.chi(a, e) - variables.x(consumer, v))
                     >= 0
                 ).named(f"arrival[{a},{e},{v}]")
 
-    def _delivery_before_limit(self, ctx: BuildContext, a: DataKey) -> Iterator[Row]:
+    def _delivery_before_limit(
+        self,
+        ctx: BuildContext,
+        starts: TransmissionStarts,
+        routing: RoutingVariables,
+        a: DataKey,
+    ) -> Iterator[Row]:
         # (16b) ξ_{a,e} + D_{a,e} + λ_e ≤ τ̂_r + (D_{a,e} + λ_e)(1 − χ_{a,e}), for e into g
-        data, variables = ctx.data, ctx.variables
+        data = ctx.data
         if not data.is_final(a):
             return
         ground = data.ground_station
@@ -113,8 +170,8 @@ class StoreAndForwardBlock(ConstraintBlock):
         for e in data.incoming(ground):
             time_e = data.transmission_time(a, e) + data.latency(e)
             yield (
-                (limit + time_e * (1 - variables.chi(a, e)))
-                - LinExpr.var(variables.xi(a, e))
+                (limit + time_e * (1 - routing.chi(a, e)))
+                - LinExpr.var(starts.xi(a, e))
                 - time_e
                 >= 0
             ).named(f"deliver[{a},{e}]")
