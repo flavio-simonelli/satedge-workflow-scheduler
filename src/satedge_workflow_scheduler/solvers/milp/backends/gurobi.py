@@ -20,7 +20,12 @@ from satedge_workflow_scheduler.solvers.milp.backends.ports import (
     VarKind,
 )
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
-from satedge_workflow_scheduler.solvers.milp.expr import Row, Sense, Var
+from satedge_workflow_scheduler.solvers.milp.expr import (
+    Row,
+    Sense,
+    Var,
+    screen_empty_rows,
+)
 
 
 def _import_gurobipy() -> ModuleType:
@@ -74,7 +79,7 @@ class GurobiBackend:
             Sense.GE: grb.GREATER_EQUAL,
             Sense.EQ: grb.EQUAL,
         }
-        for row in rows:
+        for row in screen_empty_rows(rows):
             if math.isnan(row.rhs) or any(math.isnan(c) for c in row.terms.values()):
                 raise ModelBuildError(
                     f"row {row.name!r} has a NaN coefficient or bound"

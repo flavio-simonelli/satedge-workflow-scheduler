@@ -20,7 +20,7 @@ from satedge_workflow_scheduler.solvers.milp.backends.ports import (
     VarKind,
 )
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
-from satedge_workflow_scheduler.solvers.milp.expr import Row, Var
+from satedge_workflow_scheduler.solvers.milp.expr import Row, Var, screen_empty_rows
 
 
 @dataclass(frozen=True)
@@ -82,7 +82,7 @@ class FakeRecordingBackend:
             ModelBuildError: If a row uses a variable that was never added: that is an error of
                 the model, and the real solvers would report it only later, or not at all.
         """
-        for row in rows:
+        for row in screen_empty_rows(rows):
             for var in row.terms:
                 if not 0 <= var < len(self.variables):
                     raise ModelBuildError(

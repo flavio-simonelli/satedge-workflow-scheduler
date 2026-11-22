@@ -11,11 +11,13 @@ backends receive.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Self
+
+from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
 
 Var = int
 """Handle of a variable, assigned by the backend when the variable is created."""
@@ -165,3 +167,32 @@ class Row:
     def named(self, name: str) -> Row:
         """The same row with a new name."""
         return Row(self.terms, self.sense, self.rhs, name)
+
+
+_TOLERANCE = 1e-9
+
+
+def screen_empty_rows(rows: Iterable[Row]) -> Iterator[Row]:
+    """The rows that still contain a variable, in order.
+
+    A row with no variable left, for example ``0 ≤ 1 − 0`` once the zero terms have disappeared,
+    is a constant. If it holds it is dropped: it constrains nothing. If it does not hold, the
+    model is infeasible by construction, and the error says which row it is.
+
+    Raises:
+        ModelBuildError: If a row without variables is never satisfied.
+    """
+    for row in rows:
+        if row.terms:
+            yield row
+            continue
+        lhs, rhs = 0.0, row.rhs
+        holds = {
+            Sense.LE: lhs <= rhs + _TOLERANCE,
+            Sense.GE: lhs >= rhs - _TOLERANCE,
+            Sense.EQ: abs(lhs - rhs) <= _TOLERANCE,
+        }[row.sense]
+        if not holds:
+            raise ModelBuildError(
+                f"row {row.name!r} has no variable and is never satisfied"
+            )

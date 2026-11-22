@@ -3,18 +3,9 @@
 from __future__ import annotations
 
 import pytest
+from sample import HORIZON, sample_instance
 
 from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
-from satedge_workflow_scheduler.domain.instance import ProblemInstance
-from satedge_workflow_scheduler.domain.network import (
-    AlwaysAvailable,
-    Arc,
-    Network,
-    Plane,
-    WindowedAvailability,
-)
-from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
-from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode, may_reject
 from satedge_workflow_scheduler.solvers.milp.model_data import (
     DataKey,
@@ -22,66 +13,10 @@ from satedge_workflow_scheduler.solvers.milp.model_data import (
     TaskKey,
 )
 
-HORIZON = 600.0
-
-
-def _instance() -> ProblemInstance:
-    """Two satellites, S1 with the raw data, and the ground station G.
-
-    S1 -> S2 is always available; S2 -> G is available only in [0, 1000]. Both satellites
-    compute in [0, 100], with an HPC rate of 1 Gbps.
-    """
-    windows = WindowSet((TimeWindow(0.0, 100.0),))
-    s1 = Satellite(id="S1", plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=windows)
-    s2 = Satellite(id="S2", plmm_capacity=10.0, hpc_rate=1.0, hpc_windows=windows)
-    arcs = (
-        Arc("S1", "S2", capacity=1.0, latency=1.0, availability=AlwaysAvailable()),
-        Arc("S2", "S1", capacity=1.0, latency=1.0, availability=AlwaysAvailable()),
-        Arc(
-            "S2",
-            "G",
-            capacity=2.0,
-            latency=5.0,
-            availability=WindowedAvailability(WindowSet((TimeWindow(0.0, 1000.0),))),
-        ),
-    )
-    network = Network(
-        planes=(Plane(id=1, satellites=(s1, s2), com="S2"),),
-        ground_station=GroundStation(id="G"),
-        arcs=arcs,
-    )
-    request = Request(
-        id="r1",
-        priority=Priority.URGENT,
-        origin="S1",
-        release=0.0,
-        deadline=500.0,
-        raw_size=2.0,
-        tasks=(
-            Task(execution_time=10.0, output_size=3.0),
-            Task(execution_time=20.0, output_size=1.0),
-        ),
-    )
-    other = Request(
-        id="r2",
-        priority=Priority.NON_URGENT,
-        origin="S2",
-        release=0.0,
-        deadline=550.0,
-        raw_size=1.0,
-        tasks=(Task(execution_time=5.0, output_size=2.0),),
-    )
-    return ProblemInstance(
-        network=network,
-        requests=(request, other),
-        horizon=HORIZON,
-        plan_release={"S1": 0.0, "S2": 0.0},
-    )
-
 
 @pytest.fixture
 def data() -> ModelData:
-    return ModelData(_instance(), DeadlineMode.HARD)
+    return ModelData(sample_instance(), DeadlineMode.HARD)
 
 
 # --- sets ----------------------------------------------------------------------------
@@ -190,14 +125,14 @@ def test_plan_release_and_horizon_are_read(data: ModelData) -> None:
 
 
 def test_hard_deadlines_use_each_request_deadline() -> None:
-    data = ModelData(_instance(), DeadlineMode.HARD)
+    data = ModelData(sample_instance(), DeadlineMode.HARD)
     assert data.limit("r1") == pytest.approx(500.0)
     assert data.limit("r2") == pytest.approx(550.0)
     assert data.may_reject()
 
 
 def test_soft_deadlines_use_the_horizon_and_forbid_rejection() -> None:
-    data = ModelData(_instance(), DeadlineMode.SOFT)
+    data = ModelData(sample_instance(), DeadlineMode.SOFT)
     assert data.limit("r1") == pytest.approx(HORIZON)
     assert data.limit("r2") == pytest.approx(HORIZON)
     assert not data.may_reject()

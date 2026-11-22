@@ -6,7 +6,13 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from satedge_workflow_scheduler.solvers.milp.expr import LinExpr, Row, Sense
+from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
+from satedge_workflow_scheduler.solvers.milp.expr import (
+    LinExpr,
+    Row,
+    Sense,
+    screen_empty_rows,
+)
 
 
 def test_variable_has_unit_coefficient() -> None:
@@ -146,3 +152,30 @@ def test_total_equals_repeated_addition(
     assert set(total.terms) == set(by_hand.terms)
     for var in total.terms:
         assert total.terms[var] == pytest.approx(by_hand.terms[var])
+
+
+def test_a_row_without_variables_that_holds_is_dropped() -> None:
+    kept = list(
+        screen_empty_rows(
+            [Row({}, Sense.LE, 1.0, "trivial"), Row({0: 1.0}, Sense.LE, 1.0)]
+        )
+    )
+    assert [r.name for r in kept] == [""]
+
+
+def test_a_row_without_variables_that_never_holds_is_a_model_error() -> None:
+    with pytest.raises(ModelBuildError, match="never satisfied"):
+        list(screen_empty_rows([Row({}, Sense.GE, 1.0, "impossible")]))
+
+
+def test_equality_without_variables_needs_a_zero_right_hand_side() -> None:
+    assert list(screen_empty_rows([Row({}, Sense.EQ, 0.0)])) == []
+    with pytest.raises(ModelBuildError):
+        list(screen_empty_rows([Row({}, Sense.EQ, 2.0, "eq")]))
+
+
+def test_zero_terms_do_not_reach_a_row_built_from_rejection() -> None:
+    rejection = LinExpr.number(0)
+    row = LinExpr.var(0) >= 3 * (1 - rejection)
+    assert dict(row.terms) == {0: 1.0}
+    assert row.rhs == 3.0
