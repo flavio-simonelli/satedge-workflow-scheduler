@@ -38,7 +38,6 @@ def test_from_routing_on_the_task_timing_replaces_the_fixed_delays() -> None:
     [
         (Level.LINK_CONTENTION, "link_contention"),
         (Level.PLMM_CAPACITY, "plmm_flow"),
-        (Level.ONLINE, "online"),
     ],
 )
 def test_each_level_adds_its_block_at_the_end_of_the_previous_one(
@@ -49,7 +48,7 @@ def test_each_level_adds_its_block_at_the_end_of_the_previous_one(
 
 
 def test_from_routing_on_the_levels_only_grow() -> None:
-    levels = (Level.ROUTING, Level.LINK_CONTENTION, Level.PLMM_CAPACITY, Level.ONLINE)
+    levels = (Level.ROUTING, Level.LINK_CONTENTION, Level.PLMM_CAPACITY)
     for smaller, larger in itertools.pairwise(levels):
         assert set(block_names(MilpConfig(level=smaller))) <= set(
             block_names(MilpConfig(level=larger))
@@ -98,3 +97,16 @@ def test_the_plmm_formulation_is_chosen_in_the_config() -> None:
     )
     assert "plmm_flow" in flow and "plmm_events" not in flow
     assert "plmm_events" in events and "plmm_flow" not in events
+
+
+def test_the_online_state_adds_its_blocks_at_any_level() -> None:
+    for level in (Level.ROUTING, Level.LINK_CONTENTION, Level.PLMM_CAPACITY):
+        offline = block_names(MilpConfig(level=level))
+        online = block_names(MilpConfig(level=level), online=True)
+        assert online == (*offline, "committed_tasks", "committed_transfers")
+
+
+def test_without_routing_the_online_state_fixes_only_the_tasks() -> None:
+    names = block_names(MilpConfig(level=Level.FIXED_DELAY_WINDOWS), online=True)
+    assert "committed_tasks" in names
+    assert "committed_transfers" not in names

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
 from typing import Any
 
 from satedge_workflow_scheduler.common.intervals import TimeWindow, WindowSet
@@ -17,6 +17,7 @@ from satedge_workflow_scheduler.domain.network import (
 )
 from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
 from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
+from satedge_workflow_scheduler.domain.solution import Schedule, TaskExecution, Transfer
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
 from satedge_workflow_scheduler.solvers.milp.backends.fake_recording import (
     FakeRecordingBackend,
@@ -99,11 +100,27 @@ class Built:
         return row
 
 
+def online_instance(plan_release: Mapping[str, float]) -> ProblemInstance:
+    """The sample instance at a later epoch: r2 is committed, r1 is new.
+
+    The committed calendar of r2 is the one the offline model finds: its task on S2 in [0, 8],
+    and its output on S2 → G from 8, with a transmission of 1 s.
+    """
+    committed = Schedule(
+        executions=(TaskExecution("r2", 0, "S2", 0.0, 8.0),),
+        transfers=(Transfer("r2", 1, "S2", "G", 8.0, 9.0),),
+    )
+    return replace(sample_instance(), plan_release=plan_release, committed=committed)
+
+
 def build(
-    blocks: Sequence[ConstraintBlock[Any]], mode: DeadlineMode = DeadlineMode.HARD
+    blocks: Sequence[ConstraintBlock[Any]],
+    mode: DeadlineMode = DeadlineMode.HARD,
+    instance: ProblemInstance | None = None,
 ) -> Built:
-    """Build ``blocks`` on the sample instance, in order, through the builder."""
-    data = ModelData(sample_instance(), mode)
+    """Build ``blocks`` on ``instance`` (the sample one by default), in order, through the
+    builder."""
+    data = ModelData(instance if instance is not None else sample_instance(), mode)
     backend = FakeRecordingBackend()
     model = ModelBuilder(data, backend).build(blocks)
     return Built(BuildContext(data, model.variables, model.families), backend, model)

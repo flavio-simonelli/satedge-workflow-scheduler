@@ -18,28 +18,22 @@ from satedge_workflow_scheduler.solvers.milp.errors import MilpConfigError
 
 
 @pytest.mark.parametrize(
-    ("level", "routed", "contention", "plmm", "online"),
+    ("level", "routed", "contention", "plmm"),
     [
-        (Level.FIXED_DELAY_WINDOWS, False, False, False, False),
-        (Level.ROUTING, True, False, False, False),
-        (Level.LINK_CONTENTION, True, True, False, False),
-        (Level.PLMM_CAPACITY, True, True, True, False),
-        (Level.ONLINE, True, True, True, True),
+        (Level.FIXED_DELAY_WINDOWS, False, False, False),
+        (Level.ROUTING, True, False, False),
+        (Level.LINK_CONTENTION, True, True, False),
+        (Level.PLMM_CAPACITY, True, True, True),
     ],
 )
 def test_each_level_adds_exactly_its_part(
-    level: Level, routed: bool, contention: bool, plmm: bool, online: bool
+    level: Level, routed: bool, contention: bool, plmm: bool
 ) -> None:
-    assert (level.routed, level.contention, level.plmm, level.online) == (
-        routed,
-        contention,
-        plmm,
-        online,
-    )
+    assert (level.routed, level.contention, level.plmm) == (routed, contention, plmm)
 
 
 def test_levels_are_ordered_and_start_at_three() -> None:
-    assert [int(level) for level in Level] == [3, 4, 5, 6, 7]
+    assert [int(level) for level in Level] == [3, 4, 5, 6]
 
 
 def test_default_configuration_is_the_plain_hard_model() -> None:

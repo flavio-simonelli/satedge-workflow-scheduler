@@ -54,7 +54,8 @@ class MilpSolver:
         """
         data = ModelData(instance, self._config.deadline)
         backend = self._backend()
-        model = ModelBuilder(data, backend).build(blocks_for(self._config))
+        blocks = blocks_for(self._config, online=data.is_online)
+        model = ModelBuilder(data, backend).build(blocks)
         context = BuildContext(data, model.variables, model.families)
         backend.set_objective(dict(objective(context).terms))
 

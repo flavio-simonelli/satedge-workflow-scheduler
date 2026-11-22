@@ -19,7 +19,9 @@ from satedge_workflow_scheduler.solvers.milp.errors import MilpConfigError
 class Level(IntEnum):
     """The levels of the document that build the model, each one adding a part.
 
-    Level 2 (packing with fixed delays) is not implemented: the first level is 3.
+    Level 2 (packing with fixed delays) is not implemented: the first level is 3. The online
+    state (level 7 of the document) is not a level here: it belongs to the instance, which may
+    have committed requests and a plan release, and the model adds it at any level.
     """
 
     FIXED_DELAY_WINDOWS = 3
@@ -30,8 +32,6 @@ class Level(IntEnum):
     """One transmission at a time on each link."""
     PLMM_CAPACITY = 6
     """The capacity of the PLMM of each satellite."""
-    ONLINE = 7
-    """The whole final model, with a committed calendar kept fixed and the release of the plan."""
 
     @property
     def routed(self) -> bool:
@@ -47,11 +47,6 @@ class Level(IntEnum):
     def plmm(self) -> bool:
         """Whether the capacity of the PLMM is modelled."""
         return self >= Level.PLMM_CAPACITY
-
-    @property
-    def online(self) -> bool:
-        """Whether the committed calendar of a previous plan is kept fixed."""
-        return self >= Level.ONLINE
 
 
 class PlmmStrategy(Enum):

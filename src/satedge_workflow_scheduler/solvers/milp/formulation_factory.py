@@ -26,6 +26,10 @@ from satedge_workflow_scheduler.solvers.milp.blocks.link_contention import (
     LinkContentionBlock,
 )
 from satedge_workflow_scheduler.solvers.milp.blocks.link_window import LinkWindowBlock
+from satedge_workflow_scheduler.solvers.milp.blocks.online import (
+    CommittedTasksBlock,
+    CommittedTransfersBlock,
+)
 from satedge_workflow_scheduler.solvers.milp.blocks.path import PathBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.plmm_events import PlmmEventsBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.plmm_flow import PlmmFlowBlock
@@ -73,7 +77,6 @@ _BLOCKS_OF_LEVEL: dict[Level, tuple[str, ...]] = {
     Level.ROUTING: _ROUTED_LEVEL,
     Level.LINK_CONTENTION: (*_ROUTED_LEVEL, "link_contention"),
     Level.PLMM_CAPACITY: (*_ROUTED_LEVEL, "link_contention", "plmm"),
-    Level.ONLINE: (*_ROUTED_LEVEL, "link_contention", "plmm", "online"),
 }
 
 _PLMM_BLOCKS_OF_FORMULATION: dict[PlmmFormulation, tuple[str, ...]] = {
@@ -98,6 +101,8 @@ IMPLEMENTED: dict[str, type[ConstraintBlock[Any]]] = {
     "arrival_without_big_m": ArrivalWithoutBigMBlock,
     "contact_capacity": ContactCapacityBlock,
     "link_window": LinkWindowBlock,
+    "committed_tasks": CommittedTasksBlock,
+    "committed_transfers": CommittedTransfersBlock,
     "link_contention": LinkContentionBlock,
     "plmm_occupation": PlmmOccupationBlock,
     "plmm_flow": PlmmFlowBlock,
@@ -110,11 +115,13 @@ IMPLEMENTED: dict[str, type[ConstraintBlock[Any]]] = {
 """The blocks with a class. Each block is registered here when it is written."""
 
 
-def block_names(config: MilpConfig) -> tuple[str, ...]:
+def block_names(config: MilpConfig, online: bool = False) -> tuple[str, ...]:
     """The names of the blocks of the model of ``config``, in the order they are built.
 
     The names are those of the document's levels, and they are returned whether or not the
-    block is implemented.
+    block is implemented. With ``online``, the instance has an online state, and the blocks
+    that fix the committed calendar and impose the plan release are added at the end of the
+    level: the tasks at every level, the transmissions only where they are routed.
     """
     names: list[str] = []
     for name in _BLOCKS_OF_LEVEL[config.level]:
@@ -124,6 +131,10 @@ def block_names(config: MilpConfig) -> tuple[str, ...]:
             names.append(name)
     if config.deadline is DeadlineMode.SOFT:
         names.append("tardiness")
+    if online:
+        names.append("committed_tasks")
+        if config.level.routed:
+            names.append("committed_transfers")
     if config.strengthening.arrival_without_big_m:
         names = [
             "arrival_without_big_m" if name == "arrival" else name for name in names
@@ -134,13 +145,14 @@ def block_names(config: MilpConfig) -> tuple[str, ...]:
     return tuple(names)
 
 
-def blocks_for(config: MilpConfig) -> tuple[ConstraintBlock, ...]:
+def blocks_for(config: MilpConfig, online: bool = False) -> tuple[ConstraintBlock, ...]:
     """The blocks of the model of ``config``, instantiated and in the order they are built.
 
     Raises:
         ModelBuildError: If a block of the level has no class yet.
     """
-    missing = [name for name in block_names(config) if name not in IMPLEMENTED]
+    names = block_names(config, online)
+    missing = [name for name in names if name not in IMPLEMENTED]
     if missing:
         raise ModelBuildError(f"blocks not implemented yet: {', '.join(missing)}")
-    return tuple(IMPLEMENTED[name]() for name in block_names(config))
+    return tuple(IMPLEMENTED[name]() for name in names)

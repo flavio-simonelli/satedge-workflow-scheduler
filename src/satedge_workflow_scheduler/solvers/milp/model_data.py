@@ -1,7 +1,7 @@
 """The data of the model: the sets and the parameters of the notation, read from an instance.
 
 :class:`ModelData` translates the instance into the notation of the document: the tasks and
-the data of the new requests, the arcs, the windows, the durations, the sizes and the costs. It
+the data of all the requests, committed and new, the committed calendar, the arcs, the windows, the durations, the sizes and the costs. It
 holds data only, and nothing about variables, constraints or solvers. The blocks read it, and
 never read the instance directly.
 
@@ -28,12 +28,14 @@ from satedge_workflow_scheduler.scheduling.deadline import (
     delivery_limit,
     may_reject,
 )
+from satedge_workflow_scheduler.scheduling.feasibility import FEASIBILITY_TOLERANCE
 from satedge_workflow_scheduler.scheduling.objective import (
     rejection_weights,
     response_epsilon,
     tardiness_weights,
 )
 from satedge_workflow_scheduler.scheduling.windows import arc_windows
+from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
 
 ArcId = int
 """Position of an arc in ``Network.arcs``: the arcs are referred to by it."""
@@ -61,11 +63,42 @@ class DataKey:
         return f"{self.request_id}#{self.data_index}"
 
 
-class ModelData:
-    """The sets and parameters of the notation, for the new requests of an instance.
+@dataclass(frozen=True)
+class CommittedExecution:
+    """The committed execution of a task: ``ŝ_i``, ``ŵ_i`` and ``t̂_i`` of the document.
 
-    Committed requests are not in the model data: their calendar is fixed by the online state, and
-    their tasks and data do not get variables.
+    Attributes:
+        satellite: The satellite that runs the task.
+        window: Position of the computing window that contains the execution.
+        start: The start of the execution.
+    """
+
+    satellite: NodeId
+    window: int
+    start: float
+
+
+@dataclass(frozen=True)
+class CommittedTransfer:
+    """The committed transmission of a data item on an arc: ``ξ̂_{a,e}`` and ``ĥ_{a,e}``.
+
+    Attributes:
+        start: The start of the transmission.
+        window: Position of the visibility window that contains it, or ``None`` on an arc that
+            is always available.
+    """
+
+    start: float
+    window: int | None
+
+
+class ModelData:
+    """The sets and parameters of the notation, for all the requests of an instance.
+
+    The committed requests are in the model like the new ones, with their variables: the online
+    block fixes them to the committed calendar (option A of the document). Keeping them in the
+    model lets the existing blocks keep the new requests away from them on the HPCs, on the arcs
+    and in the PLMMs, and it leaves room for a future replanning, which would fix fewer of them.
 
     Args:
         instance: The instance to read.
@@ -75,7 +108,21 @@ class ModelData:
     def __init__(self, instance: ProblemInstance, deadline: DeadlineMode) -> None:
         self._instance = instance
         self._deadline = deadline
-        self._requests = {r.id: r for r in instance.new_requests}
+        self._requests = {r.id: r for r in instance.requests}
+        self._committed = instance.committed.request_ids
+        self._arc_of = {
+            (arc.source, arc.target): e for e, arc in enumerate(instance.network.arcs)
+        }
+        self._executions = {
+            TaskKey(x.request_id, x.task_index): x
+            for x in instance.committed.executions
+        }
+        self._transfers: dict[DataKey, dict[ArcId, float]] = {}
+        for t in instance.committed.transfers:
+            arc = self.arc_between(t.source, t.target)
+            self._transfers.setdefault(DataKey(t.request_id, t.data_index), {})[arc] = (
+                t.start
+            )
         self._rejection_costs = rejection_weights(instance.requests)
         self._tardiness_weights = tardiness_weights(instance.requests, instance.horizon)
 
@@ -83,12 +130,86 @@ class ModelData:
 
     @property
     def request_ids(self) -> tuple[str, ...]:
-        """Identifiers of the new requests, in instance order (the FIFO tie-break order)."""
+        """Identifiers of all the requests, committed and new, in instance order (the FIFO
+        tie-break order)."""
         return tuple(self._requests)
 
     @property
+    def new_request_ids(self) -> tuple[str, ...]:
+        """``R^new``: the requests still to plan, in instance order."""
+        return tuple(r for r in self._requests if r not in self._committed)
+
+    def is_committed(self, request_id: str) -> bool:
+        """Whether the request is in ``R^imp``, the committed calendar."""
+        return request_id in self._committed
+
+    @property
+    def is_online(self) -> bool:
+        """Whether the instance has an online state: committed requests or a plan release."""
+        return bool(self._committed) or any(
+            self.plan_release(s) > 0 for s in self.satellites
+        )
+
+    # --- committed calendar --------------------------------------------------------------
+
+    def committed_execution(self, i: TaskKey) -> CommittedExecution:
+        """``ŝ_i``, ``ŵ_i``, ``t̂_i``: the committed execution of the task ``i``.
+
+        Raises:
+            ModelBuildError: If the task is not committed, or if its execution is in no
+                computing window of its satellite.
+        """
+        execution = self._executions.get(i)
+        if execution is None:
+            raise ModelBuildError(f"task {i} is not committed")
+        windows = self.hpc_windows(execution.satellite)
+        for w, window in enumerate(windows):
+            if _contains(window.start, window.end, execution.start, execution.end):
+                return CommittedExecution(execution.satellite, w, execution.start)
+        raise ModelBuildError(
+            f"committed task {i} on {execution.satellite} is in no computing window"
+        )
+
+    def committed_transfers(self, a: DataKey) -> Mapping[ArcId, CommittedTransfer]:
+        """``χ̂_{a,·}``, ``ξ̂_{a,·}``, ``ĥ_{a,·}``: the arcs a committed data item crosses.
+
+        The arcs not in the result are not crossed. The visibility window of a transmission is
+        the one that contains it, transmission and latency included.
+
+        Raises:
+            ModelBuildError: If a transmission is in no visibility window of its arc.
+        """
+        result: dict[ArcId, CommittedTransfer] = {}
+        for e, start in self._transfers.get(a, {}).items():
+            windows = self.link_windows(e)
+            if windows is None:
+                result[e] = CommittedTransfer(start, None)
+                continue
+            end = start + self.transmission_time(a, e) + self.latency(e)
+            for h, window in enumerate(windows):
+                if _contains(window.start, window.end, start, end):
+                    result[e] = CommittedTransfer(start, h)
+                    break
+            else:
+                raise ModelBuildError(
+                    f"committed transmission of {a} on arc {e} is in no visibility window"
+                )
+        return result
+
+    def arc_between(self, source: NodeId, target: NodeId) -> ArcId:
+        """The arc from ``source`` to ``target``.
+
+        Raises:
+            ModelBuildError: If there is no such arc.
+        """
+        try:
+            return self._arc_of[(source, target)]
+        except KeyError:
+            raise ModelBuildError(f"no arc from {source} to {target}") from None
+
+    @property
     def tasks(self) -> tuple[TaskKey, ...]:
-        """The real tasks ``I`` of the new requests, pipeline by pipeline."""
+        """The real tasks ``I`` of all the requests, pipeline by pipeline."""
         return tuple(
             TaskKey(rid, k)
             for rid in self.request_ids
@@ -132,7 +253,7 @@ class ModelData:
 
     @property
     def data(self) -> tuple[DataKey, ...]:
-        """The data ``D̄`` of the new requests: the raw data, the intermediate data and the
+        """The data ``D̄`` of all the requests: the raw data, the intermediate data and the
         final output of each request."""
         return tuple(
             DataKey(rid, k)
@@ -259,7 +380,7 @@ class ModelData:
         return delivery_limit(self._request(request_id), self._deadline, self.horizon)
 
     def may_reject(self) -> bool:
-        """Whether the new requests may be rejected under the deadline policy."""
+        """Whether the requests may be rejected under the deadline policy."""
         return may_reject(self._deadline)
 
     def due(self, request_id: str) -> float:
@@ -303,3 +424,11 @@ class ModelData:
     def mode(self) -> DeadlineMode:
         """The deadline mode the data were read with."""
         return self._deadline
+
+
+_TOLERANCE = FEASIBILITY_TOLERANCE
+"""Tolerance on the instants of the committed calendar, the same as the checker's."""
+
+
+def _contains(lo: float, hi: float, start: float, end: float) -> bool:
+    return lo - _TOLERANCE <= start and end <= hi + _TOLERANCE
