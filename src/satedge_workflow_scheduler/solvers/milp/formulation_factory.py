@@ -14,16 +14,19 @@ from __future__ import annotations
 
 from typing import Any
 
+from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
 from satedge_workflow_scheduler.solvers.milp.blocks.assignment import AssignmentBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.base import ConstraintBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.computing_window import (
     ComputingWindowBlock,
 )
+from satedge_workflow_scheduler.solvers.milp.blocks.delivery import DeliveryBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.link_window import LinkWindowBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.path import PathBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.store_and_forward import (
     StoreAndForwardBlock,
 )
+from satedge_workflow_scheduler.solvers.milp.blocks.tardiness import TardinessBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.task_overlap import TaskOverlapBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.task_timing import TaskTimingBlock
 from satedge_workflow_scheduler.solvers.milp.config import Level, MilpConfig
@@ -66,6 +69,8 @@ IMPLEMENTED: dict[str, type[ConstraintBlock[Any]]] = {
     "path": PathBlock,
     "store_and_forward": StoreAndForwardBlock,
     "link_window": LinkWindowBlock,
+    "delivery": DeliveryBlock,
+    "tardiness": TardinessBlock,
     "task_overlap": TaskOverlapBlock,
     "task_timing": TaskTimingBlock,
 }
@@ -79,6 +84,8 @@ def block_names(config: MilpConfig) -> tuple[str, ...]:
     block is implemented.
     """
     names = list(_BLOCKS_OF_LEVEL[config.level])
+    if config.deadline is DeadlineMode.SOFT:
+        names.append("tardiness")
     for flag, name in _STRENGTHENINGS.items():
         if getattr(config.strengthening, flag):
             names.append(name)

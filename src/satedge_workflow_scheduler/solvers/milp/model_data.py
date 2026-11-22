@@ -30,6 +30,7 @@ from satedge_workflow_scheduler.scheduling.deadline import (
 )
 from satedge_workflow_scheduler.scheduling.objective import (
     rejection_weights,
+    response_epsilon,
     tardiness_weights,
 )
 from satedge_workflow_scheduler.scheduling.windows import arc_windows
@@ -171,6 +172,10 @@ class ModelData:
         """The satellite that holds the raw data of the request."""
         return self._request(request_id).origin
 
+    def final_data(self, request_id: str) -> DataKey:
+        """The final output ``last_r`` of the request, which goes to the ground station."""
+        return DataKey(request_id, len(self._request(request_id).tasks))
+
     def is_final(self, a: DataKey) -> bool:
         """Whether ``a`` is the final output of its request."""
         return a.data_index == len(self._request(a.request_id).tasks)
@@ -245,6 +250,10 @@ class ModelData:
         """Whether the new requests may be rejected under the deadline policy."""
         return may_reject(self._deadline)
 
+    def due(self, request_id: str) -> float:
+        """``dl_r``: the deadline of the request, as given by the instance."""
+        return self._request(request_id).deadline
+
     def release(self, request_id: str) -> float:
         """``b_r``: instant from which the raw data of the request is available."""
         return self._request(request_id).release
@@ -252,6 +261,11 @@ class ModelData:
     def plan_release(self, satellite: NodeId) -> float:
         """``b^plan_s``: instant from which the new plan reaches ``satellite``."""
         return self._instance.release_of(satellite)
+
+    @property
+    def epsilon(self) -> float:
+        """``ε``: weight of the response time in the objective (1′) and (1″)."""
+        return response_epsilon(self._instance.requests)
 
     @property
     def rejection_costs(self) -> Mapping[str, float]:

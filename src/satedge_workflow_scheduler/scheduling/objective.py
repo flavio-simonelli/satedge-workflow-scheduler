@@ -25,6 +25,23 @@ def rejection_weights(requests: Sequence[Request]) -> dict[str, float]:
     }
 
 
+def response_epsilon(requests: Sequence[Request]) -> float:
+    """Return ``ε = κ_min / (1 + Σ_r (dl_r − rel_r))``, the weight of the response time.
+
+    It is small enough that the response time never changes the order of two schedules with
+    different rejection costs: the rejection costs dominate, and the response time breaks ties.
+    The cost ``κ_min`` is the smallest rejection cost, as in the appendix on ε of the document.
+
+    Raises:
+        InstanceError: If there are no requests.
+    """
+    if not requests:
+        raise InstanceError("the response weight needs at least one request")
+    kappa_min = min(rejection_weights(requests).values())
+    slack = sum(r.deadline - r.release for r in requests)
+    return kappa_min / (1.0 + slack)
+
+
 def tardiness_weights(
     requests: Sequence[Request], horizon: float, resolution: float = 1.0
 ) -> dict[str, float]:
