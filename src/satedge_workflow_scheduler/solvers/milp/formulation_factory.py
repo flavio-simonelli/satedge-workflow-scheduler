@@ -19,6 +19,7 @@ from satedge_workflow_scheduler.solvers.milp.blocks.base import ConstraintBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.computing_window import (
     ComputingWindowBlock,
 )
+from satedge_workflow_scheduler.solvers.milp.blocks.link_window import LinkWindowBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.path import PathBlock
 from satedge_workflow_scheduler.solvers.milp.blocks.store_and_forward import (
     StoreAndForwardBlock,
@@ -64,6 +65,7 @@ IMPLEMENTED: dict[str, type[ConstraintBlock[Any]]] = {
     "computing_window": ComputingWindowBlock,
     "path": PathBlock,
     "store_and_forward": StoreAndForwardBlock,
+    "link_window": LinkWindowBlock,
     "task_overlap": TaskOverlapBlock,
     "task_timing": TaskTimingBlock,
 }
