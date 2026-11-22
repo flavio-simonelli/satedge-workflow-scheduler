@@ -69,10 +69,9 @@ class EarliestArrivalRouter:
         tx = arc.transmission_time(size)
         busy = self._ledger.timeline(ArcKey(arc.source, arc.target))
 
-        if not arc.is_windowed:
+        if not isinstance(arc.availability, WindowedAvailability):
             return busy.first_gap(ready, tx, self._eps)
 
-        assert isinstance(arc.availability, WindowedAvailability)
         for window in arc.availability.windows:
             if window.end < ready + tx + arc.latency - self._eps:
                 continue

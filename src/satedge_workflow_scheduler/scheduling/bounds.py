@@ -40,10 +40,14 @@ from satedge_workflow_scheduler.common.intervals import (
     WindowSet,
 )
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
-from satedge_workflow_scheduler.domain.network import Arc, Network, WindowedAvailability
+from satedge_workflow_scheduler.domain.network import Network
 from satedge_workflow_scheduler.domain.nodes import NodeId
 from satedge_workflow_scheduler.domain.requests import Request
-from satedge_workflow_scheduler.scheduling.windows import earliest_finish, latest_start
+from satedge_workflow_scheduler.scheduling.windows import (
+    arc_windows,
+    earliest_finish,
+    latest_start,
+)
 
 type NodeTimes = Mapping[NodeId, float]
 
@@ -254,7 +258,9 @@ def _forward(
             if arc.target == ground and not to_ground:
                 continue
             ready = max(t, release(node))
-            arrival = _ef(_windows(arc), ready, arc.traversal_time(size), eps)
+            arrival = _ef(
+                arc_windows(arc.availability), ready, arc.traversal_time(size), eps
+            )
             if arrival < best[arc.target]:
                 best[arc.target] = arrival
                 heapq.heappush(heap, (arrival, next(counter), arc.target))
@@ -280,17 +286,13 @@ def _backward(
             continue
         for index in network.incoming[node]:
             arc = network.arcs[index]
-            departure = _ls(_windows(arc), t, arc.traversal_time(size), eps)
+            departure = _ls(
+                arc_windows(arc.availability), t, arc.traversal_time(size), eps
+            )
             if departure > best[arc.source]:
                 best[arc.source] = departure
                 heapq.heappush(heap, (-departure, next(counter), arc.source))
     return best
-
-
-def _windows(arc: Arc) -> WindowSet | None:
-    if isinstance(arc.availability, WindowedAvailability):
-        return arc.availability.windows
-    return None
 
 
 def _ef(windows: WindowSet | None, ready: float, length: float, eps: float) -> float:

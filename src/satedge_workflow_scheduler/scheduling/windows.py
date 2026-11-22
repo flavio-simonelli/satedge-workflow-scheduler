@@ -24,8 +24,22 @@ from satedge_workflow_scheduler.common.intervals import (
     BusyTimeline,
     WindowSet,
 )
+from satedge_workflow_scheduler.domain.network import (
+    AlwaysAvailable,
+    Availability,
+    WindowedAvailability,
+)
 
 _FREE = BusyTimeline()
+
+
+def arc_windows(availability: Availability) -> WindowSet | None:
+    """The windows of an arc with ``availability``, ``None`` if it is always available."""
+    match availability:
+        case WindowedAvailability(windows=windows):
+            return windows
+        case AlwaysAvailable():
+            return None
 
 
 def earliest_finish(

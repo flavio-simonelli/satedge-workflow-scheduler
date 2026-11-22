@@ -7,7 +7,15 @@ from satedge_workflow_scheduler.common.intervals import (
     TimeWindow,
     WindowSet,
 )
-from satedge_workflow_scheduler.scheduling.windows import earliest_finish, latest_start
+from satedge_workflow_scheduler.domain.network import (
+    AlwaysAvailable,
+    WindowedAvailability,
+)
+from satedge_workflow_scheduler.scheduling.windows import (
+    arc_windows,
+    earliest_finish,
+    latest_start,
+)
 
 # two windows, [10, 20] and [30, 50]
 WINDOWS = WindowSet((TimeWindow(10.0, 20.0), TimeWindow(30.0, 50.0)))
@@ -78,3 +86,11 @@ def test_latest_start_in_windows(
 def test_latest_start_without_windows() -> None:
     assert latest_start(None, 10.0, 4.0) == 6.0
     assert latest_start(None, 3.0, 4.0) is None
+
+
+def test_arc_windows_of_a_windowed_arc_are_its_visibility_windows() -> None:
+    assert arc_windows(WindowedAvailability(WINDOWS)) is WINDOWS
+
+
+def test_arc_windows_of_an_always_available_arc_are_none() -> None:
+    assert arc_windows(AlwaysAvailable()) is None

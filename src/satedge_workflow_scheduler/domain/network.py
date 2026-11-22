@@ -88,11 +88,6 @@ class Arc:
         """Readable arc name ``source->target``."""
         return f"{self.source}->{self.target}"
 
-    @property
-    def is_windowed(self) -> bool:
-        """Whether the arc is available only in its visibility windows."""
-        return isinstance(self.availability, WindowedAvailability)
-
     def transmission_time(self, size: float) -> float:
         """Time to transmit ``size`` Gb on this arc, in seconds."""
         return size / self.capacity
