@@ -40,12 +40,15 @@ class ConstraintBlock(ABC):
     Attributes:
         name: Short name of the block, for the report.
         equations: The equations of the document that the block writes, for example "(2)".
-        requires: The families of decision variables the block reads.
+        requires: The families of variables the block reads: decision variables, or the
+            auxiliary ones that an earlier block provides.
+        provides: The auxiliary families the block creates, for the blocks that follow it.
     """
 
     name: ClassVar[str]
     equations: ClassVar[str]
     requires: ClassVar[frozenset[str]]
+    provides: ClassVar[frozenset[str]] = frozenset()
 
     def __init_subclass__(cls, **kwargs: object) -> None:
         super().__init_subclass__(**kwargs)

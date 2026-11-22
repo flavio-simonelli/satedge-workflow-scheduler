@@ -27,7 +27,7 @@ class TaskTimingBlock(ConstraintBlock):
 
     name = "task timing"
     equations = "(3), (4)"
-    requires = frozenset({"rho", "t", "u"})
+    requires = frozenset({"rejection", "t", "u"})
 
     def rows(self, ctx: BuildContext) -> Iterator[Row]:
         yield from self._precedences(ctx)

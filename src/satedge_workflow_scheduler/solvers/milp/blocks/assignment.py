@@ -21,7 +21,7 @@ class AssignmentBlock(ConstraintBlock):
 
     name = "assignment"
     equations = "(2)"
-    requires = frozenset({"rho", "u"})
+    requires = frozenset({"rejection", "u"})
 
     def rows(self, ctx: BuildContext) -> Iterator[Row]:
         variables = ctx.variables

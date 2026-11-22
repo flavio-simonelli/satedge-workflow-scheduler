@@ -26,6 +26,9 @@ from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
 from satedge_workflow_scheduler.solvers.milp.expr import LinExpr, Var
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData, TaskKey
 
+DECISION_FAMILIES = frozenset({"rejection", "t", "u"})
+"""The families of decision variables: the ones every block can read."""
+
 WindowIndex = int
 """Position of a computing window in the windows of its satellite, in chronological order."""
 
