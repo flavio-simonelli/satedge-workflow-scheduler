@@ -35,3 +35,12 @@ def delivery_limit(request: Request, mode: DeadlineMode, horizon: float) -> floa
     if mode is DeadlineMode.HARD:
         return request.deadline
     return horizon
+
+
+def may_reject(mode: DeadlineMode) -> bool:
+    """Whether a request may be rejected under ``mode``.
+
+    With hard deadlines a request that cannot meet its deadline is rejected; with soft
+    deadlines every request is served, so none is rejected.
+    """
+    return mode is DeadlineMode.HARD
