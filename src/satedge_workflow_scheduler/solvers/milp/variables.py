@@ -38,7 +38,7 @@ from satedge_workflow_scheduler.solvers.milp.model_data import (
     TaskKey,
 )
 
-DECISION_FAMILIES = frozenset({"rejection", "t", "u", "chi", "nu"})
+DECISION_FAMILIES = frozenset({"rejection", "t", "u", "chi", "nu", "xi"})
 """The families of decision variables: the ones the blocks can read. ``chi`` and ``nu`` exist
 only when a block requires them, because the levels without routing do not have them."""
 
@@ -59,6 +59,8 @@ class DecisionVariables:
             the satellite, in chronological order.
         arc_chi: ``χ_{a,e}`` as a variable, by data and arc, for the arcs that are always
             available. Empty when the formulation has no routing.
+        arc_start: ``ξ_{a,e}``, by data and arc: the start of the transmission of ``a`` on ``e``.
+            Empty when the formulation has no store-and-forward.
         arc_windows: ``ν_{a,e,·}``, by data and arc, for the arcs with visibility windows: one
             variable per window of the arc, in chronological order.
     """
@@ -69,6 +71,7 @@ class DecisionVariables:
     in_window: Mapping[tuple[TaskKey, str], tuple[Var, ...]]
     arc_chi: Mapping[tuple[DataKey, ArcId], Var]
     arc_windows: Mapping[tuple[DataKey, ArcId], tuple[Var, ...]]
+    arc_start: Mapping[tuple[DataKey, ArcId], Var]
 
     def rejection(self, request_id: str) -> LinExpr:
         """``ρ_r`` as an expression: the variable under hard deadlines, the constant 0 under
@@ -92,6 +95,10 @@ class DecisionVariables:
             return LinExpr.var(self.arc_chi[(a, arc)])
         windows = _lookup(self.arc_windows, (a, arc), "chi")
         return LinExpr.total(LinExpr.var(nu) for nu in windows)
+
+    def xi(self, a: DataKey, arc: ArcId) -> Var:
+        """``ξ_{a,e}``: start of the transmission of ``a`` on ``arc``."""
+        return _lookup(self.arc_start, (a, arc), "xi")
 
     def nu(self, a: DataKey, arc: ArcId, window: WindowIndex) -> Var:
         """``ν_{a,e,h}``: 1 if the transmission of ``a`` on ``arc`` is in the window ``h``."""
@@ -152,6 +159,14 @@ def create_decision_variables(
     # requires "chi" or "nu" (the routing levels), so the levels without routing have none.
     arc_chi: dict[tuple[DataKey, ArcId], Var] = {}
     arc_windows: dict[tuple[DataKey, ArcId], tuple[Var, ...]] = {}
+    arc_start: dict[tuple[DataKey, ArcId], Var] = {}
+    if "xi" in families:
+        # ξ_{a,e} ∈ [0, τ̂_r]: the transmission starts before the time limit of its request
+        for a in data.data:
+            for e in data.arc_ids:
+                arc_start[(a, e)] = sink.add_var(
+                    0.0, data.limit(a.request_id), VarKind.CONTINUOUS, f"xi[{a},{e}]"
+                )
     if families & {"chi", "nu"}:
         for a in data.data:
             for e in data.arc_ids:
@@ -167,7 +182,13 @@ def create_decision_variables(
                     for h in range(len(link_windows))
                 )
     return DecisionVariables(
-        frozenset(data.request_ids), rejected, start, in_window, arc_chi, arc_windows
+        frozenset(data.request_ids),
+        rejected,
+        start,
+        in_window,
+        arc_chi,
+        arc_windows,
+        arc_start,
     )
 
 

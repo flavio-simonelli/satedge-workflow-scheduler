@@ -43,7 +43,9 @@ def test_each_family_has_one_variable_per_index() -> None:
     # 5 data on the 2 arcs always available, and on the windowed arc S2→G, one window each
     assert len(_by_name(backend, "chi[")) == 5 * 2
     assert len(_by_name(backend, "nu[")) == 5 * 1
-    assert len(backend.variables) == 2 + 3 + 6 + 5 * 2 + 5 * 1
+    # ξ on all 3 arcs for the 5 data
+    assert len(_by_name(backend, "xi[")) == 5 * 3
+    assert len(backend.variables) == 2 + 3 + 6 + 5 * 2 + 5 * 1 + 5 * 3
 
 
 def test_handles_are_consecutive_and_match_the_recorded_variables() -> None:
