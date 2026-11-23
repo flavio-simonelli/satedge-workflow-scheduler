@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import itertools
+import math
+
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -17,7 +20,9 @@ from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
 from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
 from satedge_workflow_scheduler.domain.solution import TaskExecution, Transfer
 from satedge_workflow_scheduler.scheduling.plmm_occupancy import (
+    FreeInterval,
     PlmmOccupancyInterval,
+    free_intervals,
     load_profile,
     overloads,
     plmm_intervals,
@@ -206,3 +211,92 @@ def test_overloads_return_the_segments_above_capacity_with_their_data() -> None:
     assert [(s.start, s.end, s.load) for s in over] == [(4.0, 5.0, 5.0)]
     assert over[0].items == (a, b)
     assert overloads(profile, capacity=5.0) == ()
+
+
+def _spans(intervals: tuple[FreeInterval, ...]) -> list[tuple[float, float]]:
+    return [(i.start, i.end) for i in intervals]
+
+
+def test_an_empty_plmm_is_free_from_zero_on() -> None:
+    assert _spans(free_intervals([], capacity=10.0, size=2.0)) == [(0.0, math.inf)]
+
+
+def test_an_occupancy_without_room_splits_the_free_time() -> None:
+    a = PlmmOccupancyInterval("a", 0, 9.0, start=4.0, end=8.0)
+    assert _spans(free_intervals([a], capacity=10.0, size=2.0)) == [
+        (0.0, 4.0),
+        (8.0, math.inf),
+    ]
+
+
+def test_an_occupancy_that_leaves_room_does_not_split_it() -> None:
+    a = PlmmOccupancyInterval("a", 0, 8.0, start=4.0, end=8.0)
+    assert _spans(free_intervals([a], capacity=10.0, size=2.0)) == [(0.0, math.inf)]
+
+
+def test_adjacent_occupancies_without_room_make_one_gap() -> None:
+    a = PlmmOccupancyInterval("a", 0, 9.0, start=4.0, end=6.0)
+    b = PlmmOccupancyInterval("b", 0, 9.0, start=6.0, end=8.0)
+    assert _spans(free_intervals([a, b], capacity=10.0, size=2.0)) == [
+        (0.0, 4.0),
+        (8.0, math.inf),
+    ]
+
+
+def test_a_plmm_full_from_zero_has_no_interval_before_it_frees_up() -> None:
+    a = PlmmOccupancyInterval("a", 0, 9.0, start=0.0, end=5.0)
+    assert _spans(free_intervals([a], capacity=10.0, size=2.0)) == [(5.0, math.inf)]
+
+
+def test_a_data_item_larger_than_the_plmm_fits_nowhere() -> None:
+    assert free_intervals([], capacity=10.0, size=11.0) == ()
+
+
+def test_a_free_interval_is_half_open() -> None:
+    interval = FreeInterval(4.0, 8.0)
+    assert interval.contains(4.0)
+    assert interval.contains(7.9)
+    assert not interval.contains(8.0)
+
+
+def test_a_free_interval_covers_the_stays_inside_it() -> None:
+    interval = FreeInterval(4.0, 8.0)
+    assert interval.covers(4.0, 8.0)
+    assert interval.covers(5.0, 6.0)
+    assert not interval.covers(3.0, 6.0)
+    assert not interval.covers(5.0, 9.0)
+
+
+@given(
+    st.lists(_interval, max_size=20),
+    st.floats(min_value=0.1, max_value=10.0),
+)
+def test_free_intervals_are_exactly_where_the_data_item_fits(
+    raw: list[tuple[float, float, float]], size: float
+) -> None:
+    items = [
+        PlmmOccupancyInterval(f"r{k}", 0, s, start, start + duration)
+        for k, (start, duration, s) in enumerate(raw)
+    ]
+    capacity = 12.0
+    eps = 1e-9
+    profile = load_profile(items)
+    far = 1000.0  # every item ends before this
+
+    def fits(start: float, end: float) -> bool:
+        """Oracle: the largest load of the profile inside ``[start, end)``, plus ``size``."""
+        peak = max(
+            (s.load for s in profile if s.start < end - eps and s.end > start + eps),
+            default=0.0,
+        )
+        return peak + size <= capacity + eps
+
+    intervals = free_intervals(items, capacity, size)
+    # it fits in each interval...
+    for interval in intervals:
+        assert fits(interval.start, min(interval.end, far))
+    # ...and nowhere between them: they are maximal
+    gaps = itertools.pairwise([FreeInterval(0.0, 0.0), *intervals])
+    for before, after in gaps:
+        if after.start > before.end:
+            assert not fits(before.end, after.start)

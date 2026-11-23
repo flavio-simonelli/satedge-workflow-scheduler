@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import math
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -191,3 +192,52 @@ def within_capacity(
 ) -> bool:
     """Whether the PLMM load of ``items`` stays within ``capacity``, up to ``eps``."""
     return not overloads(load_profile(items, eps), capacity, eps)
+
+
+@dataclass(frozen=True, slots=True)
+class FreeInterval:
+    """A maximal interval ``[start, end)`` in which a PLMM has room for one more data item.
+
+    ``end`` is ``+inf`` for the last interval, when the PLMM stays free from ``start`` on.
+    """
+
+    start: float
+    end: float
+
+    def contains(self, instant: float, eps: float = TIME_TOLERANCE) -> bool:
+        """Whether ``instant`` lies in ``[start, end)``, up to ``eps``."""
+        return self.start - eps <= instant < self.end - eps
+
+    def covers(self, start: float, end: float, eps: float = TIME_TOLERANCE) -> bool:
+        """Whether the stay ``[start, end)`` lies entirely in this interval, up to ``eps``."""
+        return self.start - eps <= start and end <= self.end + eps
+
+
+def free_intervals(
+    items: Iterable[PlmmOccupancyInterval],
+    capacity: float,
+    size: float,
+    eps: float = TIME_TOLERANCE,
+) -> tuple[FreeInterval, ...]:
+    """The maximal intervals of ``[0, +inf)`` in which ``size`` Gb more fit in a PLMM.
+
+    The PLMM holds ``items`` and has ``capacity``. A data item of ``size`` fits in an
+    interval if the load of the profile (:func:`load_profile`) plus ``size`` stays within
+    ``capacity`` at every instant of it. So a stay ``[start, end)`` of the data item has
+    room exactly when one of the intervals covers it (:meth:`FreeInterval.covers`).
+
+    The intervals come in time order. There is none if the data item is larger than the
+    whole PLMM.
+    """
+    if size > capacity + eps:
+        return ()
+    result: list[FreeInterval] = []
+    start = 0.0
+    for segment in load_profile(items, eps):
+        if segment.load + size <= capacity + eps:
+            continue
+        if segment.start > start + eps:
+            result.append(FreeInterval(start, segment.start))
+        start = max(start, segment.end)
+    result.append(FreeInterval(start, math.inf))
+    return tuple(result)
