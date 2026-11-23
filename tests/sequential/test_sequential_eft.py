@@ -67,3 +67,19 @@ def test_a_full_plmm_at_the_origin_fails_the_request_with_its_reason() -> None:
     plan = _plan(reservations)
     assert isinstance(plan, PlanFailure)
     assert plan.reason == "task 0: no room in the PLMM for its input on the way"
+
+
+def test_without_backtracks_the_search_is_the_greedy_placement() -> None:
+    instance = sample_instance()
+    request = instance.request("r1")
+    bounds = request_bounds(instance, request, LIMIT)
+    greedy = EftScheduler(SafeIntervalRouter(), max_backtracks=0).schedule(
+        instance, request, bounds, Reservations()
+    )
+    searching = EftScheduler(SafeIntervalRouter(), max_backtracks=5).schedule(
+        instance, request, bounds, Reservations()
+    )
+    assert isinstance(greedy, RequestPlan)
+    assert isinstance(searching, RequestPlan)
+    assert searching.schedule == greedy.schedule
+    assert searching.delivery_time == greedy.delivery_time

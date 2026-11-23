@@ -19,7 +19,11 @@ For each task, in pipeline order:
 For the last task the delivery is part of the choice: the output is routed to the ground station,
 and the candidate that delivers first is chosen.
 
-This scheduler does not backtrack: if a task has no candidate that fits, the request fails.
+The search goes task by task, trying the candidates of each task in EFT order. If the tasks
+that follow cannot be placed after a candidate, the search goes back and tries the next candidate
+of the earlier task. Each such return costs one unit of the budget ``max_backtracks``: when the
+budget is spent, the request fails with the reason of the deepest failure. With no budget the
+search is the greedy placement: the first candidate that fits is the only one tried.
 """
 
 from __future__ import annotations
@@ -51,6 +55,20 @@ from satedge_workflow_scheduler.solvers.sequential.routing.ports import (
 )
 
 
+@dataclass
+class _Budget:
+    """How many returns to an earlier task the search may still make for one request."""
+
+    remaining: int
+
+    def spend(self) -> bool:
+        """Use one return if there is one left; ``False`` when the budget is spent."""
+        if self.remaining <= 0:
+            return False
+        self.remaining -= 1
+        return True
+
+
 @dataclass(frozen=True)
 class _Progress:
     """Where the placement of a request has got to.
@@ -77,11 +95,16 @@ class EftScheduler:
 
     Args:
         router: How the data items are routed.
+        max_backtracks: How many returns to an earlier task the search may make for one request.
+            ``0`` is the greedy placement.
         eps: Tolerance for comparisons between instants.
     """
 
-    def __init__(self, router: Router, eps: float = TIME_TOLERANCE) -> None:
+    def __init__(
+        self, router: Router, max_backtracks: int = 0, eps: float = TIME_TOLERANCE
+    ) -> None:
         self._router = router
+        self._max_backtracks = max_backtracks
         self._eps = eps
 
     def schedule(
@@ -95,31 +118,47 @@ class EftScheduler:
         progress = _Progress(
             reservations, request.origin, request.release, request.release
         )
-        last = len(request.tasks) - 1
-        for task_index in range(last):
-            step = self._place_task(instance, request, bounds, task_index, progress)
-            if isinstance(step, PlanFailure):
-                return step
-            progress = step
-        return self._place_last_task(instance, request, bounds, progress)
+        budget = _Budget(self._max_backtracks)
+        return self._search(instance, request, bounds, 0, progress, budget)
 
-    def _place_task(
+    def _search(
         self,
         instance: ProblemInstance,
         request: Request,
         bounds: RequestBounds,
         task_index: int,
         progress: _Progress,
-    ) -> _Progress | PlanFailure:
-        """Place a task that is not the last one: the first candidate that fits."""
+        budget: _Budget,
+    ) -> RequestPlan | PlanFailure:
+        """Place the tasks from ``task_index`` on, trying the candidates in EFT order.
+
+        A candidate that cannot be placed, because its PLMM has no room, is skipped at no cost:
+        the greedy placement skips it too. A candidate whose later tasks fail costs one unit of the
+        budget before the next candidate is tried.
+        """
+        if task_index == len(request.tasks) - 1:
+            return self._place_last_task(instance, request, bounds, progress)
         candidates = self._candidates(instance, request, bounds, task_index, progress)
         if not candidates:
             return self._no_candidate(instance, request, bounds, task_index, progress)
+        failure: PlanFailure = PlanFailure(
+            f"task {task_index}: no candidate has room in the PLMM"
+        )
+        tried = False
         for candidate in candidates:
             after = self._fix(request, task_index, candidate, progress)
-            if after is not None:
-                return after
-        return PlanFailure(f"task {task_index}: no candidate has room in the PLMM")
+            if after is None:
+                continue
+            if tried and not budget.spend():
+                return failure
+            tried = True
+            result = self._search(
+                instance, request, bounds, task_index + 1, after, budget
+            )
+            if isinstance(result, RequestPlan):
+                return result
+            failure = result
+        return failure
 
     def _place_last_task(
         self,
