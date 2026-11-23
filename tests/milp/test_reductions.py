@@ -9,7 +9,7 @@ module, which does not know the model.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 
 import pytest
@@ -346,7 +346,7 @@ def test_under_soft_deadlines_it_makes_the_instance_infeasible() -> None:
 # --- the optimum does not change (Gurobi) -------------------------------------------------
 
 
-_INSTANCES = {
+_INSTANCES: dict[str, Callable[[], ProblemInstance]] = {
     "sample": sample_instance,
     "tight": lambda: sample_instance({"S1": 4.0}),
     "apart": _apart,
