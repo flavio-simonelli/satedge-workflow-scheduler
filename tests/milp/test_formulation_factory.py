@@ -72,8 +72,13 @@ def test_strengthenings_add_their_blocks_only_when_chosen() -> None:
     assert strengthened == (*replaced, "contact_capacity")
 
 
-def test_a_block_without_a_class_is_a_model_error_not_an_omission() -> None:
-    with pytest.raises(ModelBuildError, match="not implemented yet"):
+def test_a_block_without_a_class_is_a_model_error_not_an_omission(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from satedge_workflow_scheduler.solvers.milp import formulation_factory
+
+    monkeypatch.delitem(formulation_factory.IMPLEMENTED, "fixed_route")
+    with pytest.raises(ModelBuildError, match="not implemented yet: fixed_route"):
         blocks_for(MilpConfig(level=Level.FIXED_DELAY_WINDOWS))
 
 

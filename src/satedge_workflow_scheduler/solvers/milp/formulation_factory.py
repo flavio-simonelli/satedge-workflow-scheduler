@@ -23,6 +23,10 @@ from satedge_workflow_scheduler.solvers.milp.blocks.computing_window import (
     ComputingWindowBlock,
 )
 from satedge_workflow_scheduler.solvers.milp.blocks.delivery import DeliveryBlock
+from satedge_workflow_scheduler.solvers.milp.blocks.fixed_delay import (
+    FixedDelayBlock,
+    FixedRouteBlock,
+)
 from satedge_workflow_scheduler.solvers.milp.blocks.link_contention import (
     LinkContentionBlock,
 )
@@ -59,6 +63,7 @@ _FIXED_DELAY_LEVEL: tuple[str, ...] = (
     "assignment",
     "computing_window",
     "task_overlap",
+    "fixed_route",
     "fixed_delay",
 )
 
@@ -103,6 +108,8 @@ IMPLEMENTED: dict[str, type[ConstraintBlock[Any]]] = {
     "arrival_without_big_m": ArrivalWithoutBigMBlock,
     "contact_capacity": ContactCapacityBlock,
     "link_window": LinkWindowBlock,
+    "fixed_route": FixedRouteBlock,
+    "fixed_delay": FixedDelayBlock,
     "committed_tasks": CommittedTasksBlock,
     "committed_transfers": CommittedTransfersBlock,
     "link_contention": LinkContentionBlock,

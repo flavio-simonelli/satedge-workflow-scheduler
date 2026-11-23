@@ -37,6 +37,10 @@ class Families:
         """Register the container of a block, under its type."""
         self._containers[type(container)] = container
 
+    def has(self, kind: type) -> bool:
+        """Whether a container of type ``kind`` was created."""
+        return kind in self._containers
+
     def get[T](self, kind: type[T]) -> T:
         """The container of type ``kind``, created by an earlier block.
 

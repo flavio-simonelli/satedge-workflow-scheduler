@@ -28,6 +28,7 @@ from satedge_workflow_scheduler.scheduling.deadline import (
     delivery_limit,
     may_reject,
 )
+from satedge_workflow_scheduler.scheduling.earliest import earliest_arrivals
 from satedge_workflow_scheduler.scheduling.feasibility import FEASIBILITY_TOLERANCE
 from satedge_workflow_scheduler.scheduling.objective import (
     rejection_weights,
@@ -110,6 +111,7 @@ class ModelData:
         self._deadline = deadline
         self._requests = {r.id: r for r in instance.requests}
         self._committed = instance.committed.request_ids
+        self._delays: dict[tuple[NodeId, float], Mapping[NodeId, float]] = {}
         self._arc_of = {
             (arc.source, arc.target): e for e, arc in enumerate(instance.network.arcs)
         }
@@ -351,6 +353,35 @@ class ModelData:
     def transmission_time(self, a: DataKey, e: ArcId) -> float:
         """``D_{a,e}``: time to transmit the data item on the arc."""
         return self._arc(e).transmission_time(self.size(a))
+
+    def fixed_delay(self, source: NodeId, target: NodeId, size: float) -> float:
+        """``γ^{hk}(d)``: the least delay of ``size`` Gb from ``source`` to ``target``.
+
+        It is the shortest path on the arcs, where an arc costs its transmission time plus its
+        latency (level 3 of the document: the visibility windows are not considered, and the
+        routers are always on). Without a path, it is ``H + 1``, a delay no time limit allows, so
+        that the pair can never be used.
+
+        Raises:
+            ModelBuildError: If a node is not in the network.
+        """
+        if source == target:
+            return 0.0
+        return self._shortest_delays(source, size).get(target, self.horizon + 1.0)
+
+    def _shortest_delays(self, source: NodeId, size: float) -> Mapping[NodeId, float]:
+        key = (source, size)
+        if key not in self._delays:
+            network = self._instance.network
+
+            def static(arc: int, ready: float) -> tuple[float, float]:
+                # without windows an arc is always open: the data leaves when it is ready
+                link = network.arcs[arc]
+                return ready, ready + link.transmission_time(size) + link.latency
+
+            reached = earliest_arrivals(network, {source: 0.0}, static)
+            self._delays[key] = {node: r.arrival for node, r in reached.items()}
+        return self._delays[key]
 
     def latency(self, e: ArcId) -> float:
         """``λ_e``: propagation latency of the arc, in seconds."""

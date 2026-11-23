@@ -31,6 +31,7 @@ from satedge_workflow_scheduler.domain.solution import (
 from satedge_workflow_scheduler.scheduling.objective import evaluate
 from satedge_workflow_scheduler.solvers.errors import SolverError
 from satedge_workflow_scheduler.solvers.milp.backends.ports import BackendStatus
+from satedge_workflow_scheduler.solvers.milp.blocks.delivery import DeliveryTimes
 from satedge_workflow_scheduler.solvers.milp.blocks.path import RoutingVariables
 from satedge_workflow_scheduler.solvers.milp.blocks.store_and_forward import (
     TransmissionStarts,
@@ -78,8 +79,7 @@ def _schedule(
     data: ModelData, model: BuiltModel, values: Mapping[Var, float]
 ) -> Schedule:
     variables = model.variables
-    starts = model.families.get(TransmissionStarts)
-    routing = model.families.get(RoutingVariables)
+    routed = model.families.has(RoutingVariables)
 
     executions: list[TaskExecution] = []
     for i in data.tasks:
@@ -99,6 +99,10 @@ def _schedule(
                 )
 
     transfers: list[Transfer] = []
+    if not routed:
+        return Schedule(tuple(executions), ())
+    starts = model.families.get(TransmissionStarts)
+    routing = model.families.get(RoutingVariables)
     for a in data.data:
         if data.is_committed(a.request_id):
             continue
@@ -127,6 +131,7 @@ def _outcomes(
     schedule: Schedule,
 ) -> tuple[RequestOutcome, ...]:
     outcomes: list[RequestOutcome] = []
+    routed = model.families.has(RoutingVariables)
     for r in data.request_ids:
         rejected = not data.is_committed(r) and (
             _value(model.variables.rejection(r), values) > _BINARY_THRESHOLD
@@ -134,7 +139,11 @@ def _outcomes(
         if rejected:
             outcomes.append(RequestOutcome(r, accepted=False))
         else:
-            delivery = _arrival_at_ground(data, schedule, r)
+            if routed:
+                delivery = _arrival_at_ground(data, schedule, r)
+            else:
+                # without routing, the delivery is the variable δ of the fixed delays
+                delivery = values.get(model.families.get(DeliveryTimes).deliv(r), 0.0)
             outcomes.append(RequestOutcome(r, accepted=True, delivery_time=delivery))
     return tuple(outcomes)
 
