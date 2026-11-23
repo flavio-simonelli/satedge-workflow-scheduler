@@ -50,6 +50,7 @@ from satedge_workflow_scheduler.solvers.milp.formulation_factory import (
 )
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
 from satedge_workflow_scheduler.solvers.milp.objective import objective
+from satedge_workflow_scheduler.solvers.milp.polish import polish
 
 BackendFactory = Callable[[], MilpBackend]
 
@@ -95,6 +96,8 @@ def solve_once(
     sink.set_objective(dict(objective(context).terms))
 
     result = sink.solve(params)
+    if config.polish:
+        result = polish(sink, model.binaries, result, params)
     if result.status is BackendStatus.INFEASIBLE:
         raise InfeasibleModelError("the model has no solution")
     if result.status in (BackendStatus.ERROR, BackendStatus.NO_SOLUTION):

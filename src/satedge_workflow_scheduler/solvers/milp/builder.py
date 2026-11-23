@@ -8,23 +8,41 @@ written, so a formulation that is not consistent leaves nothing behind in the mo
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from satedge_workflow_scheduler.solvers.milp.backends.ports import ModelSink
+from satedge_workflow_scheduler.solvers.milp.backends.ports import ModelSink, VarKind
 from satedge_workflow_scheduler.solvers.milp.blocks.base import (
     BuildContext,
     ConstraintBlock,
     Families,
 )
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
+from satedge_workflow_scheduler.solvers.milp.expr import Row, Var
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
 from satedge_workflow_scheduler.solvers.milp.variables import (
     DECISION_FAMILIES,
     DecisionVariables,
     create_decision_variables,
 )
+
+
+class _TrackingSink:
+    """The sink the blocks write to: it passes everything on, and keeps the binary variables."""
+
+    def __init__(self, sink: ModelSink) -> None:
+        self._sink = sink
+        self.binaries: list[Var] = []
+
+    def add_var(self, lb: float, ub: float, kind: VarKind, name: str = "") -> Var:
+        var = self._sink.add_var(lb, ub, kind, name)
+        if kind is VarKind.BINARY:
+            self.binaries.append(var)
+        return var
+
+    def add_rows(self, rows: Iterable[Row]) -> None:
+        self._sink.add_rows(rows)
 
 
 @dataclass(frozen=True)
@@ -36,11 +54,13 @@ class BuiltModel:
         rows: Number of rows written by each block, keyed by the name of the block, in the
             order the blocks were built.
         families: The auxiliary variables created by the blocks, by type.
+        binaries: Every binary variable of the model, the decision ones and the auxiliary ones.
     """
 
     variables: DecisionVariables
     rows: Mapping[str, int] = field(default_factory=dict)
     families: Families = field(default_factory=Families)
+    binaries: tuple[Var, ...] = ()
 
 
 class ModelBuilder:
@@ -63,14 +83,15 @@ class ModelBuilder:
                 that no decision variable and no earlier block provides.
         """
         _check_formulation(blocks)
-        variables = create_decision_variables(self._sink, self._data)
+        tracking = _TrackingSink(self._sink)
+        variables = create_decision_variables(tracking, self._data)
         families = Families()
         context = BuildContext(self._data, variables, families)
 
         rows: dict[str, int] = {}
         for block in blocks:
-            rows[block.name] = block.build(context, self._sink)
-        return BuiltModel(variables, rows, families)
+            rows[block.name] = block.build(context, tracking)
+        return BuiltModel(variables, rows, families, tuple(tracking.binaries))
 
 
 def _check_formulation(blocks: Sequence[ConstraintBlock[Any]]) -> None:

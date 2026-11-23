@@ -90,6 +90,10 @@ class MilpBackend(ModelSink, Protocol):
         """Set the linear expression to minimise, given by its coefficients."""
         ...
 
+    def set_bounds(self, var: Var, lb: float, ub: float) -> None:
+        """Change the bounds of a variable, for a later solve (the polish fixes binaries)."""
+        ...
+
     def solve(self, params: SolveParams) -> SolveResult:
         """Solve the model and return the outcome. It never raises on infeasibility."""
         ...

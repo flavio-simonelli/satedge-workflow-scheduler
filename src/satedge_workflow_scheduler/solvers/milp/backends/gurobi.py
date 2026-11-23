@@ -91,6 +91,13 @@ class GurobiBackend:
         """Minimise the linear expression given by its coefficients."""
         self._model.setObjective(self._linear(terms), self._gp.GRB.MINIMIZE)
 
+    def set_bounds(self, var: Var, lb: float, ub: float) -> None:
+        """Change the bounds of ``var``, as the polish does before its second solve."""
+        if math.isnan(lb) or math.isnan(ub):
+            raise ModelBuildError("bounds must not be NaN")
+        self._vars[var].LB = lb
+        self._vars[var].UB = ub
+
     def solve(self, params: SolveParams) -> SolveResult:
         """Solve the model and translate the outcome."""
         self._apply(params)

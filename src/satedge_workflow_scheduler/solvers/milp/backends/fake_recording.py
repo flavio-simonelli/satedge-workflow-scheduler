@@ -10,7 +10,7 @@ can be tested too.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from satedge_workflow_scheduler.solvers.milp.backends.ports import (
@@ -74,6 +74,18 @@ class FakeRecordingBackend:
         handle = len(self.variables)
         self.variables.append(RecordedVar(handle, lb, ub, kind, name))
         return handle
+
+    def set_bounds(self, var: Var, lb: float, ub: float) -> None:
+        """Change the bounds of a recorded variable.
+
+        Raises:
+            ModelBuildError: If the variable does not exist or the bounds are reversed.
+        """
+        if not 0 <= var < len(self.variables):
+            raise ModelBuildError(f"bounds of unknown variable {var}")
+        if lb > ub:
+            raise ModelBuildError(f"variable {var}: lower bound {lb} above upper {ub}")
+        self.variables[var] = replace(self.variables[var], lb=lb, ub=ub)
 
     def add_rows(self, rows: Iterable[Row]) -> None:
         """Record the rows, in order.
