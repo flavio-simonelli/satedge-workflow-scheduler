@@ -31,12 +31,14 @@ from satedge_workflow_scheduler.scheduling.deadline import (
     delivery_limit,
     may_reject,
 )
+from satedge_workflow_scheduler.scheduling.delivery import delivery_time
+from satedge_workflow_scheduler.scheduling.errors import DeliveryError
 from satedge_workflow_scheduler.scheduling.feasibility import check
 from satedge_workflow_scheduler.scheduling.objective import evaluate
 from satedge_workflow_scheduler.scheduling.screening import unrealizable_reason
 from satedge_workflow_scheduler.solvers.errors import InfeasibleModelError, SolverError
 from satedge_workflow_scheduler.solvers.sequential.config import SequentialConfig
-from satedge_workflow_scheduler.solvers.sequential.errors import SequentialConfigError
+from satedge_workflow_scheduler.solvers.sequential.errors import CommittedCalendarError
 from satedge_workflow_scheduler.solvers.sequential.factory import (
     ordering_for,
     router_for,
@@ -59,10 +61,6 @@ class SequentialSolver:
 
     Args:
         config: The members of the family to use, and the deadline mode.
-
-    Raises:
-        SequentialConfigError: At solve time, for instances with committed requests or a plan
-            release: they are not supported yet.
     """
 
     def __init__(self, config: SequentialConfig) -> None:
@@ -77,13 +75,12 @@ class SequentialSolver:
             SolverError: If the calendar violates the model, which is a bug.
         """
         config = self._config
-        _reject_online(instance)
         mode = config.deadline
         ordering = ordering_for(config.ordering)
         router = router_for(config.routing, config.eps)
         scheduler = scheduler_for(config, router)
 
-        reservations = Reservations()
+        reservations = Reservations().with_schedule(instance, instance.committed)
         if not may_reject(mode):
             for request in instance.new_requests:
                 pending = pending_raw_occupancy(instance, request, config.eps)
@@ -124,26 +121,28 @@ class SequentialSolver:
         return solution
 
 
-def _reject_online(instance: ProblemInstance) -> None:
-    """Refuse the instances with committed requests or a plan release: not supported yet."""
-    if instance.committed.request_ids or any(
-        release > 0 for release in instance.plan_release.values()
-    ):
-        raise SequentialConfigError(
-            "the sequential heuristic does not handle committed requests or a plan release yet"
-        )
-
-
 def _solution(
     instance: ProblemInstance,
     plans: Mapping[str, RequestPlan],
     failures: Mapping[str, str],
     mode: DeadlineMode,
 ) -> Solution:
-    """The outcomes in instance order, and the calendar of the planned requests."""
+    """The outcomes in instance order, and the calendar of the committed and planned requests.
+
+    The committed requests are accepted, with the delivery of their committed calendar.
+
+    Raises:
+        CommittedCalendarError: If the committed calendar does not deliver a committed request.
+    """
     outcomes: list[RequestOutcome] = []
     for request in instance.requests:
-        if request.id in plans:
+        if instance.is_committed(request.id):
+            outcomes.append(
+                RequestOutcome(
+                    request.id, True, _committed_delivery(instance, request.id)
+                )
+            )
+        elif request.id in plans:
             outcomes.append(
                 RequestOutcome(request.id, True, plans[request.id].delivery_time)
             )
@@ -155,8 +154,14 @@ def _solution(
             )
     planned = [plans[r.id].schedule for r in instance.requests if r.id in plans]
     schedule = Schedule(
-        tuple(e for s in planned for e in s.executions),
-        tuple(t for s in planned for t in s.transfers),
+        (
+            *instance.committed.executions,
+            *(e for s in planned for e in s.executions),
+        ),
+        (
+            *instance.committed.transfers,
+            *(t for s in planned for t in s.transfers),
+        ),
     )
     return Solution(
         schedule=schedule,
@@ -164,6 +169,18 @@ def _solution(
         status=SolveStatus.FEASIBLE,
         objective=evaluate(instance, outcomes, mode),
     )
+
+
+def _committed_delivery(instance: ProblemInstance, request_id: str) -> float:
+    """When the committed calendar delivers the final output of ``request_id``.
+
+    Raises:
+        CommittedCalendarError: If the committed calendar delivers no final output.
+    """
+    try:
+        return delivery_time(instance, instance.committed, request_id)
+    except DeliveryError as error:
+        raise CommittedCalendarError(str(error)) from error
 
 
 __all__ = ["SequentialSolver"]
