@@ -95,6 +95,63 @@ def earliest_arrivals(
     return {node: best[node] for node in fixed}
 
 
+LatestCrossing = Callable[[int, float], float | None]
+"""``crossing(arc, due)``: the latest departure from the tail of the arc, for the data that must
+be at its head by ``due``, or ``None`` if the arc cannot be crossed in time."""
+
+
+def latest_departures(
+    network: Network,
+    dues: Mapping[NodeId, float],
+    crossing: LatestCrossing,
+    *,
+    tolerance: float = 0.0,
+) -> dict[NodeId, float]:
+    """The latest instant the data can be on every node that it can still reach in time.
+
+    The mirror of :func:`earliest_arrivals`: the search goes backward along the arcs, from the
+    ``dues`` (the instants by which the data must be on each node) towards the sources of the
+    arcs, and it keeps the latest instant found for each node. It is correct for the same reason:
+    a departure is always earlier than the arrival it serves, because every arc has a positive
+    latency, so a node is settled at its latest instant the first time it is popped.
+
+    Args:
+        network: The network whose arcs are searched backward.
+        dues: The nodes the data must reach, with the instant by which it must be there.
+        crossing: The latest departure on an arc, see :data:`LatestCrossing`.
+        tolerance: A new departure replaces the current one only if it is later by more than this.
+
+    Returns:
+        The nodes that the search settled, each with its latest instant. The dues are included.
+    """
+    best: dict[NodeId, float] = dict(dues)
+    fixed: set[NodeId] = set()
+    counter = itertools.count()
+    heap: list[tuple[float, int, NodeId]] = [
+        (-due, next(counter), node) for node, due in dues.items()
+    ]
+    heapq.heapify(heap)
+    while heap:
+        _, _, node = heapq.heappop(heap)
+        if node in fixed:
+            continue
+        fixed.add(node)
+        due = best[node]
+        for arc_index in network.incoming[node]:
+            arc = network.arcs[arc_index]
+            if arc.source in fixed:
+                continue
+            departure = crossing(arc_index, due)
+            if departure is None:
+                continue
+            current = best.get(arc.source)
+            if current is not None and current >= departure - tolerance:
+                continue
+            best[arc.source] = departure
+            heapq.heappush(heap, (-departure, next(counter), arc.source))
+    return {node: best[node] for node in fixed}
+
+
 def path_to(reached: Mapping[NodeId, Reached], node: NodeId) -> tuple[int, ...]:
     """The arcs of the route that reaches ``node``, from its source, in order."""
     arcs: list[int] = []

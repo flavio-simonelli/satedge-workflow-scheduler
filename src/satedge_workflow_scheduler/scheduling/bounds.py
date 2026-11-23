@@ -29,8 +29,6 @@ solution because every arc has a positive latency.
 
 from __future__ import annotations
 
-import heapq
-import itertools
 import math
 from collections.abc import Callable, Mapping
 
@@ -43,6 +41,10 @@ from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import Network
 from satedge_workflow_scheduler.domain.nodes import NodeId
 from satedge_workflow_scheduler.domain.requests import Request
+from satedge_workflow_scheduler.scheduling.earliest import (
+    earliest_arrivals,
+    latest_departures,
+)
 from satedge_workflow_scheduler.scheduling.windows import (
     arc_windows,
     earliest_finish,
@@ -240,30 +242,29 @@ def _forward(
 ) -> dict[NodeId, float]:
     """Earliest availability on every node, from the instants in ``start``.
 
-    A Dijkstra search on arrival instants: correct because leaving later never makes the
-    data arrive earlier. The data leaves a node only after the plan has reached it. Only
-    the final output (``to_ground``) may enter the ground station, which never relays.
+    The earliest-arrival search of :mod:`.earliest`, with the windows of the arcs and the release
+    of the plan. The data leaves a node only after the plan has reached it. Only the final output
+    (``to_ground``) may enter the ground station, which never relays.
     """
     ground = network.ground_station.id
+
+    def crossing(index: int, arrived: float) -> tuple[float, float] | None:
+        arc = network.arcs[index]
+        if arc.target == ground and not to_ground:
+            return None
+        ready = max(arrived, release(arc.source))
+        arrival = _ef(
+            arc_windows(arc.availability), ready, arc.traversal_time(size), eps
+        )
+        return None if not math.isfinite(arrival) else (ready, arrival)
+
+    sources = {node: t for node, t in start.items() if math.isfinite(t)}
+    reached = earliest_arrivals(
+        network, sources, crossing, relays=lambda n: n != ground
+    )
     best = dict(start)
-    counter = itertools.count()
-    heap = [(t, next(counter), v) for v, t in best.items() if math.isfinite(t)]
-    heapq.heapify(heap)
-    while heap:
-        t, _, node = heapq.heappop(heap)
-        if t > best[node] or node == ground:
-            continue
-        for index in network.outgoing[node]:
-            arc = network.arcs[index]
-            if arc.target == ground and not to_ground:
-                continue
-            ready = max(t, release(node))
-            arrival = _ef(
-                arc_windows(arc.availability), ready, arc.traversal_time(size), eps
-            )
-            if arrival < best[arc.target]:
-                best[arc.target] = arrival
-                heapq.heappush(heap, (arrival, next(counter), arc.target))
+    for node, found in reached.items():
+        best[node] = min(best[node], found.arrival)
     return best
 
 
@@ -272,26 +273,22 @@ def _backward(
 ) -> dict[NodeId, float]:
     """Latest availability on every node, towards the instants in ``due``.
 
-    The mirror of :func:`_forward`: the latest departure from the tail of each arc that
-    still arrives at its head in time.
+    The mirror of :func:`_forward`: the latest departure from the tail of each arc that still
+    arrives at its head in time, with the latest-departure search of :mod:`.earliest`.
     """
+
+    def crossing(index: int, arriving_by: float) -> float | None:
+        arc = network.arcs[index]
+        departure = _ls(
+            arc_windows(arc.availability), arriving_by, arc.traversal_time(size), eps
+        )
+        return None if not math.isfinite(departure) else departure
+
+    dues = {node: t for node, t in due.items() if math.isfinite(t)}
+    found = latest_departures(network, dues, crossing)
     best = dict(due)
-    counter = itertools.count()
-    heap = [(-t, next(counter), v) for v, t in best.items() if math.isfinite(t)]
-    heapq.heapify(heap)
-    while heap:
-        neg, _, node = heapq.heappop(heap)
-        t = -neg
-        if t < best[node]:
-            continue
-        for index in network.incoming[node]:
-            arc = network.arcs[index]
-            departure = _ls(
-                arc_windows(arc.availability), t, arc.traversal_time(size), eps
-            )
-            if departure > best[arc.source]:
-                best[arc.source] = departure
-                heapq.heappush(heap, (-departure, next(counter), arc.source))
+    for node, t in found.items():
+        best[node] = max(best[node], t)
     return best
 
 

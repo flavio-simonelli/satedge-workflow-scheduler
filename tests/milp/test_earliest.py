@@ -50,3 +50,20 @@ def test_a_crossing_that_is_impossible_closes_the_arc() -> None:
     network = sample_instance().network
     reached = earliest_arrivals(network, {"S1": 0.0}, lambda arc, ready: None)
     assert set(reached) == {"S1"}
+
+
+def test_the_latest_departure_is_found_backward_through_the_intermediate_satellite() -> (
+    None
+):
+    from satedge_workflow_scheduler.scheduling.earliest import latest_departures
+
+    network = sample_instance().network
+
+    def crossing(arc: int, due: float) -> float:
+        link = network.arcs[arc]
+        return due - link.transmission_time(1.0) - link.latency
+
+    found = latest_departures(network, {"G": 10.0}, crossing)
+    # S2 → G for 1 Gb: leave S2 by 10 − 0.5 − 5 = 4.5; then S1 → S2 by 4.5 − 1 − 1 = 2.5
+    assert found["S2"] == pytest.approx(4.5)
+    assert found["S1"] == pytest.approx(2.5)
