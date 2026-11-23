@@ -53,6 +53,7 @@ class FakeRecordingBackend:
         last_params: Parameters of the last solve, or ``None`` if it never ran.
         scripted: The result that :meth:`solve` returns. By default there is none, and the
             solve reports :attr:`BackendStatus.NO_SOLUTION`.
+        starts: The starting values given by :meth:`set_start`.
     """
 
     variables: list[RecordedVar] = field(default_factory=list)
@@ -60,6 +61,7 @@ class FakeRecordingBackend:
     objective: Mapping[Var, float] | None = None
     last_params: SolveParams | None = None
     scripted: SolveResult | None = None
+    starts: dict[Var, float] = field(default_factory=dict)
 
     def add_var(self, lb: float, ub: float, kind: VarKind, name: str = "") -> Var:
         """Record a variable and return its handle.
@@ -108,6 +110,17 @@ class FakeRecordingBackend:
             if not 0 <= var < len(self.variables):
                 raise ModelBuildError(f"objective uses unknown variable {var}")
         self.objective = dict(terms)
+
+    def set_start(self, values: Mapping[Var, float]) -> None:
+        """Record the starting values, so that a test can check what the model gave.
+
+        Raises:
+            ModelBuildError: If a variable does not exist.
+        """
+        for var in values:
+            if not 0 <= var < len(self.variables):
+                raise ModelBuildError(f"starting value of unknown variable {var}")
+        self.starts.update(values)
 
     def solve(self, params: SolveParams) -> SolveResult:
         """Return the scripted result, and keep the parameters for inspection."""

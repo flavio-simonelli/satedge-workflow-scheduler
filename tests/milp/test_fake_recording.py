@@ -106,3 +106,18 @@ def test_write_dumps_variables_objective_and_rows(tmp_path: Path) -> None:
     assert lines[1].startswith("x1 [0.0, 5.0]")
     assert lines[2] == "minimise +1*x1"
     assert lines[3] == "cap: +1*x0 +1*x1 <= 4"
+
+
+def test_set_start_records_the_starting_values() -> None:
+    backend = FakeRecordingBackend()
+    a = backend.add_var(0.0, 1.0, VarKind.BINARY, "a")
+    b = backend.add_var(0.0, 5.0, VarKind.CONTINUOUS, "b")
+    backend.set_start({a: 1.0})
+    backend.set_start({b: 2.5})
+    assert backend.starts == {a: 1.0, b: 2.5}
+
+
+def test_set_start_on_an_unknown_variable_is_an_error() -> None:
+    backend = FakeRecordingBackend()
+    with pytest.raises(ModelBuildError):
+        backend.set_start({0: 1.0})

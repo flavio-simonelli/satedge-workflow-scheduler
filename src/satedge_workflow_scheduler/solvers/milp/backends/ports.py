@@ -94,6 +94,12 @@ class MilpBackend(ModelSink, Protocol):
         """Change the bounds of a variable, for a later solve (the polish fixes binaries)."""
         ...
 
+    def set_start(self, values: Mapping[Var, float]) -> None:
+        """Give the solver starting values for some variables (a warm start). Variables not in
+        ``values`` are left to the solver. A starting point is a hint: the solver may ignore it,
+        and it need not be feasible."""
+        ...
+
     def solve(self, params: SolveParams) -> SolveResult:
         """Solve the model and return the outcome. It never raises on infeasibility."""
         ...

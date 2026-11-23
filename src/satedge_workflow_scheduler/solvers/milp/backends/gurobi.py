@@ -98,6 +98,17 @@ class GurobiBackend:
         self._vars[var].LB = lb
         self._vars[var].UB = ub
 
+    def set_start(self, values: Mapping[Var, float]) -> None:
+        """Set the starting values of the variables, as the ``Start`` attribute of Gurobi.
+
+        Raises:
+            ModelBuildError: If a variable does not exist.
+        """
+        for var, value in values.items():
+            if not 0 <= var < len(self._vars):
+                raise ModelBuildError(f"starting value of unknown variable {var}")
+            self._vars[var].Start = value
+
     def solve(self, params: SolveParams) -> SolveResult:
         """Solve the model and translate the outcome."""
         self._apply(params)

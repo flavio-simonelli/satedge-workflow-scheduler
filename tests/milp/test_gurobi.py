@@ -148,3 +148,15 @@ def test_an_unbounded_model_is_reported_as_an_error() -> None:
     x = backend.add_var(0.0, float("inf"), VarKind.CONTINUOUS)
     backend.set_objective({x: -1.0})
     assert backend.solve(SolveParams()).status is BackendStatus.ERROR
+
+
+def test_a_starting_value_reaches_the_solver_and_an_unknown_variable_is_an_error() -> (
+    None
+):
+    backend = _backend()
+    x = backend.add_var(0.0, 1.0, VarKind.BINARY, "x")
+    backend.set_start({x: 1.0})
+    backend._model.update()  # Gurobi reads the attributes of the variables only after this
+    assert backend._vars[x].Start == 1.0
+    with pytest.raises(ModelBuildError):
+        backend.set_start({x + 10: 0.0})
