@@ -28,6 +28,8 @@ from satedge_workflow_scheduler.domain.solution import (
     TaskExecution,
     Transfer,
 )
+from satedge_workflow_scheduler.scheduling.delivery import delivery_time
+from satedge_workflow_scheduler.scheduling.errors import DeliveryError
 from satedge_workflow_scheduler.scheduling.objective import evaluate
 from satedge_workflow_scheduler.solvers.errors import SolverError
 from satedge_workflow_scheduler.solvers.milp.backends.ports import BackendStatus
@@ -63,7 +65,7 @@ def decode(
     schedule = Schedule(
         (*committed.executions, *new.executions), (*committed.transfers, *new.transfers)
     )
-    outcomes = _outcomes(data, model, values, schedule)
+    outcomes = _outcomes(instance, data, model, values, schedule)
     objective = evaluate(instance, outcomes, data.mode)
     solve_status = (
         SolveStatus.OPTIMAL if status is BackendStatus.OPTIMAL else SolveStatus.FEASIBLE
@@ -125,6 +127,7 @@ def _schedule(
 
 
 def _outcomes(
+    instance: ProblemInstance,
     data: ModelData,
     model: BuiltModel,
     values: Mapping[Var, float],
@@ -140,7 +143,7 @@ def _outcomes(
             outcomes.append(RequestOutcome(r, accepted=False))
         else:
             if routed:
-                delivery = _arrival_at_ground(data, schedule, r)
+                delivery = _delivery(instance, schedule, r)
             else:
                 # without routing, the delivery is the variable δ of the fixed delays
                 delivery = values.get(model.families.get(DeliveryTimes).deliv(r), 0.0)
@@ -148,22 +151,14 @@ def _outcomes(
     return tuple(outcomes)
 
 
-def _arrival_at_ground(data: ModelData, schedule: Schedule, request_id: str) -> float:
-    """The instant the final output of the request reaches the ground station.
+def _delivery(instance: ProblemInstance, schedule: Schedule, request_id: str) -> float:
+    """The delivery of a routed request, from the calendar of the solution.
 
     Raises:
-        SolverError: If no transmission brings the final output to the ground station.
+        SolverError: If the solution delivers no final output: the solver returned a
+            calendar without it, so the solution is wrong.
     """
-    final = data.final_data(request_id)
-    arrivals = [
-        t.start
-        + data.transmission_time(final, data.arc_between(t.source, t.target))
-        + data.latency(data.arc_between(t.source, t.target))
-        for t in schedule.transfers
-        if t.request_id == request_id
-        and t.data_index == final.data_index
-        and t.target == data.ground_station
-    ]
-    if not arrivals:
-        raise SolverError(f"the solution delivers no final output of {request_id}")
-    return max(arrivals)
+    try:
+        return delivery_time(instance, schedule, request_id)
+    except DeliveryError as error:
+        raise SolverError(str(error)) from error
