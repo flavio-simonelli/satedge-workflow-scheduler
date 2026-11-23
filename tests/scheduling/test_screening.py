@@ -11,6 +11,7 @@ from satedge_workflow_scheduler.domain.network import (
 from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
 from satedge_workflow_scheduler.domain.requests import Priority, Request, Task
 from satedge_workflow_scheduler.domain.solution import Schedule, TaskExecution
+from satedge_workflow_scheduler.scheduling.bounds import request_bounds
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
 from satedge_workflow_scheduler.scheduling.screening import (
     unrealizable_reason,
@@ -22,6 +23,11 @@ from satedge_workflow_scheduler.scheduling.screening import (
 # the raw takes 3 s on an arc and the output 4 s.
 # Released at 0, the best delivery is 22: raw to S2 by 3, task on S2 in [3, 18], output
 # to G by 22 (on S1 the task would end at 15, but the output needs two hops: 23).
+
+
+def _reason(request: Request, instance: ProblemInstance, limit: float) -> str | None:
+    bounds = request_bounds(instance, request, limit)
+    return unrealizable_reason(request, bounds, instance.network)
 
 
 def _instance(*requests: Request, window: float = 200.0) -> ProblemInstance:
@@ -59,19 +65,19 @@ def _request(rid: str = "r", release: float = 0.0, deadline: float = 100.0) -> R
 
 
 def test_a_feasible_request_has_no_reason() -> None:
-    assert unrealizable_reason(_request(), _instance(_request()), limit=22.0) is None
+    assert _reason(_request(), _instance(_request()), limit=22.0) is None
 
 
 def test_a_task_longer_than_every_window_fits_nowhere() -> None:
     instance = _instance(_request(), window=10.0)
-    reason = unrealizable_reason(_request(), instance, limit=100.0)
+    reason = _reason(_request(), instance, limit=100.0)
     assert reason == "task 0 fits in no computing window"
 
 
 def test_the_delivery_to_the_ground_counts() -> None:
     # The pipeline alone ends at 15, before the limit of 21, but its output cannot
     # reach the ground before 22.
-    reason = unrealizable_reason(_request(), _instance(_request()), limit=21.0)
+    reason = _reason(_request(), _instance(_request()), limit=21.0)
     assert reason == "task 0 can run on no satellite in time to deliver by 21.0 s"
 
 

@@ -486,10 +486,7 @@ class ModelData:
         be (section "Richieste impossibili" of the document), with the tolerance of
         :meth:`bounds`."""
         return unrealizable_reason(
-            self._request(request_id),
-            self._instance,
-            self.limit(request_id),
-            eps=_TOLERANCE,
+            self._request(request_id), self.bounds(request_id), self._instance.network
         )
 
     @property

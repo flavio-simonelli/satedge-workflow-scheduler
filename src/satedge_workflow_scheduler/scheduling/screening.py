@@ -15,36 +15,35 @@ from __future__ import annotations
 
 from satedge_workflow_scheduler.common.intervals import TIME_TOLERANCE
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
+from satedge_workflow_scheduler.domain.network import Network
 from satedge_workflow_scheduler.domain.requests import Request
-from satedge_workflow_scheduler.scheduling.bounds import request_bounds
+from satedge_workflow_scheduler.scheduling.bounds import RequestBounds, request_bounds
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode, delivery_limit
 
 
 def unrealizable_reason(
-    request: Request,
-    instance: ProblemInstance,
-    limit: float,
-    eps: float = TIME_TOLERANCE,
+    request: Request, bounds: RequestBounds, network: Network
 ) -> str | None:
-    """Why ``request`` can never be delivered by ``limit``, or ``None`` if it may be.
+    """Why ``request`` can never be delivered by ``bounds.limit``, or ``None`` if it may be.
 
-    The reason names the first task that can run on no satellite, and says whether it is
-    longer than every computing window or only cannot be placed in time. ``eps`` is the
-    tolerance of the bounds (:func:`request_bounds`) and of the comparison with the windows.
+    ``bounds`` are the a priori bounds of the request (:func:`request_bounds`), which the
+    caller usually needs anyway. The reason names the first task that can run on no
+    satellite, and says whether it is longer than every computing window or only cannot
+    be placed in time.
     """
-    bounds = request_bounds(instance, request, limit, eps)
     for task_index in range(len(request.tasks)):
         if bounds.executable_satellites(task_index):
             continue
         fits_somewhere = any(
-            w.duration >= request.hpc_duration(task_index, s) - eps
-            for s in instance.network.satellites
+            w.duration >= request.hpc_duration(task_index, s) - TIME_TOLERANCE
+            for s in network.satellites
             for w in s.hpc_windows
         )
         if not fits_somewhere:
             return f"task {task_index} fits in no computing window"
         return (
-            f"task {task_index} can run on no satellite in time to deliver by {limit} s"
+            f"task {task_index} can run on no satellite in time to deliver by "
+            f"{bounds.limit} s"
         )
     return None
 
@@ -60,7 +59,8 @@ def unrealizable_requests(
     result: dict[str, str] = {}
     for request in instance.new_requests:
         limit = delivery_limit(request, mode, instance.horizon)
-        reason = unrealizable_reason(request, instance, limit)
+        bounds = request_bounds(instance, request, limit)
+        reason = unrealizable_reason(request, bounds, instance.network)
         if reason is not None:
             result[request.id] = reason
     return result
