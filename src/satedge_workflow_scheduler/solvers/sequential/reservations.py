@@ -128,6 +128,10 @@ class Reservations:
             for item in items
         )
 
+    def without_plmm(self) -> Reservations:
+        """The same HPC and arc reservations, with every PLMM empty."""
+        return Reservations(self._hpc, self._arcs)
+
     def without_occupancies_of(self, request_id: str) -> Reservations:
         """The same reservations without the PLMM occupancies of ``request_id``."""
         plmm = {
