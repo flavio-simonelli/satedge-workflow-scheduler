@@ -39,7 +39,8 @@ class ArrivalWithoutBigMBlock(ConstraintBlock):
         routing = ctx.families.get(RoutingVariables)
         for a in data.data:
             limit = data.limit(a.request_id)
-            for e in data.arc_ids:
+            arcs = ctx.reductions.arcs(a)
+            for e in arcs:
                 # ξ_{a,e} ≤ τ̂_r χ_{a,e}: the transmission starts at zero on an unused arc
                 yield (
                     LinExpr.var(starts.xi(a, e)) - limit * routing.chi(a, e) <= 0
@@ -47,7 +48,7 @@ class ArrivalWithoutBigMBlock(ConstraintBlock):
             consumer = data.consumer(a)
             if consumer is not None:
                 # t_j ≥ ξ_{a,e} + (D_{a,e} + λ_e) χ_{a,e}, on every arc: the last hop is the latest
-                for e in data.arc_ids:
+                for e in arcs:
                     time_e = data.transmission_time(a, e) + data.latency(e)
                     yield (
                         LinExpr.var(variables.t(consumer))
@@ -57,7 +58,7 @@ class ArrivalWithoutBigMBlock(ConstraintBlock):
                     ).named(f"arrival-free[{a},{e}]")
             if data.is_final(a):
                 # ξ_{a,e} + (D_{a,e} + λ_e) χ_{a,e} ≤ τ̂_r, on every arc
-                for e in data.arc_ids:
+                for e in arcs:
                     time_e = data.transmission_time(a, e) + data.latency(e)
                     yield (
                         limit
@@ -81,9 +82,11 @@ class ContactCapacityBlock(ConstraintBlock):
             windows = data.link_windows(e)
             if windows is None:
                 continue
+            users = [a for a in data.data if ctx.reductions.crosses(a, e)]
             for h, window in enumerate(windows):
                 used = LinExpr.total(
                     data.transmission_time(a, e) * LinExpr.var(routing.nu(a, e, h))
-                    for a in data.data
+                    for a in users
+                    if h in routing.link_windows(a, e)
                 )
                 yield (used <= window.end - window.start).named(f"contact[{e},{h}]")

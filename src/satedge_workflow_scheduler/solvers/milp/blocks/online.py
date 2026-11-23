@@ -32,6 +32,7 @@ from satedge_workflow_scheduler.solvers.milp.blocks.path import RoutingVariables
 from satedge_workflow_scheduler.solvers.milp.blocks.store_and_forward import (
     TransmissionStarts,
 )
+from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
 from satedge_workflow_scheduler.solvers.milp.expr import LinExpr, Row
 from satedge_workflow_scheduler.solvers.milp.model_data import DataKey, TaskKey
 
@@ -57,8 +58,10 @@ class CommittedTasksBlock(ConstraintBlock):
     def _fix_task(self, ctx: BuildContext, i: TaskKey) -> Iterator[Row]:
         data, variables = ctx.data, ctx.variables
         fixed = data.committed_execution(i)
+        if fixed.window not in variables.windows(i, fixed.satellite):
+            raise ModelBuildError(f"the committed window of {i} is not in the model")
         for s in data.satellites:
-            for w in range(len(data.hpc_windows(s))):
+            for w in variables.windows(i, s):
                 chosen = 1.0 if (s, w) == (fixed.satellite, fixed.window) else 0.0
                 yield (LinExpr.var(variables.u(i, s, w)) == chosen).named(
                     f"committed-u[{i},{s},{w}]"
@@ -104,14 +107,22 @@ class CommittedTransfersBlock(ConstraintBlock):
         routing = ctx.families.get(RoutingVariables)
         starts = ctx.families.get(TransmissionStarts)
         crossed = data.committed_transfers(a)
-        for e in data.arc_ids:
+        arcs = ctx.reductions.arcs(a)
+        for e, committed in crossed.items():
+            if e not in arcs or (
+                committed.window is not None
+                and committed.window not in routing.link_windows(a, e)
+            ):
+                raise ModelBuildError(
+                    f"the committed transmission of {a} on arc {e} is not in the model"
+                )
+        for e in arcs:
             hop = crossed.get(e)
-            windows = data.link_windows(e)
-            if windows is None:
+            if data.link_windows(e) is None:
                 used = 1.0 if hop is not None else 0.0
                 yield (routing.chi(a, e) == used).named(f"committed-chi[{a},{e}]")
             else:
-                for h in range(len(windows)):
+                for h in routing.link_windows(a, e):
                     chosen = 1.0 if hop is not None and hop.window == h else 0.0
                     yield (LinExpr.var(routing.nu(a, e, h)) == chosen).named(
                         f"committed-nu[{a},{e},{h}]"
@@ -125,7 +136,7 @@ class CommittedTransfersBlock(ConstraintBlock):
         data = ctx.data
         routing = ctx.families.get(RoutingVariables)
         starts = ctx.families.get(TransmissionStarts)
-        for e in data.arc_ids:
+        for e in ctx.reductions.arcs(a):
             tail, _ = data.endpoints(e)
             if tail not in data.satellites:
                 continue  # the ground station has no plan release

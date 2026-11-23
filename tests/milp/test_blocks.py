@@ -19,6 +19,7 @@ from satedge_workflow_scheduler.solvers.milp.blocks.base import (
 from satedge_workflow_scheduler.solvers.milp.blocks.task_timing import TaskTimingBlock
 from satedge_workflow_scheduler.solvers.milp.expr import Row, Sense
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData, TaskKey
+from satedge_workflow_scheduler.solvers.milp.reductions import Reductions
 from satedge_workflow_scheduler.solvers.milp.variables import create_decision_variables
 
 
@@ -26,7 +27,7 @@ def _context(mode: DeadlineMode) -> tuple[BuildContext, FakeRecordingBackend]:
     data = ModelData(sample_instance(), mode)
     backend = FakeRecordingBackend()
     variables = create_decision_variables(backend, data)
-    return BuildContext(data, variables), backend
+    return BuildContext(data, variables, Reductions.none(data)), backend
 
 
 def _row(rows: Sequence[Row], name: str) -> Row:

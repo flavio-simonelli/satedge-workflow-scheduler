@@ -10,6 +10,10 @@ cross it: ``σ = 1`` if ``a`` precedes ``b``, ``σ = 0`` otherwise.
 
 Both constraints are relaxed by the big-M when one of the two data does not cross the arc, and
 the big-M of the pair is the larger of the two time limits plus its transmission time.
+
+Reduction 4: the triples are those of the reductions, where both data can cross the arc and can
+occupy it at the same time. Elsewhere the two transmissions never overlap, and ``σ`` and the two
+rows are not written.
 """
 
 from __future__ import annotations
@@ -60,42 +64,39 @@ class LinkContentionBlock(ConstraintBlock[LinkOrder]):
     requires = frozenset({"xi", "chi"})
 
     def variables(self, ctx: BuildContext, sink: ModelSink) -> LinkOrder:
-        order: dict[Triple, Var] = {}
-        for a, b in ctx.data.link_pairs:
-            for e in ctx.data.arc_ids:
-                order[(a, b, e)] = sink.add_var(
-                    0.0, 1.0, VarKind.BINARY, f"sigma[{a},{b},{e}]"
-                )
+        order: dict[Triple, Var] = {
+            (a, b, e): sink.add_var(0.0, 1.0, VarKind.BINARY, f"sigma[{a},{b},{e}]")
+            for a, b, e in ctx.reductions.link_triples
+        }
         return LinkOrder(order)
 
     def rows(self, ctx: BuildContext, aux: LinkOrder) -> Iterator[Row]:
         data = ctx.data
         starts = ctx.families.get(TransmissionStarts)
         routing = ctx.families.get(RoutingVariables)
-        for a, b in data.link_pairs:
-            for e in data.arc_ids:
-                tx_a = data.transmission_time(a, e)
-                tx_b = data.transmission_time(b, e)
-                big_m = max(
-                    data.limit(a.request_id) + tx_a, data.limit(b.request_id) + tx_b
-                )
-                sigma = LinExpr.var(aux.sigma(a, b, e))
-                both = 2 - routing.chi(a, e) - routing.chi(b, e)
-                # (18) ξ_b − ξ_a − D_a + M(1 − σ) + M(2 − χ_a − χ_b) ≥ 0
-                yield (
-                    LinExpr.var(starts.xi(b, e))
-                    - LinExpr.var(starts.xi(a, e))
-                    - tx_a
-                    + big_m * (1 - sigma)
-                    + big_m * both
-                    >= 0
-                ).named(f"link-a[{a},{b},{e}]")
-                # (19) ξ_a − ξ_b − D_b + M σ + M(2 − χ_a − χ_b) ≥ 0
-                yield (
-                    LinExpr.var(starts.xi(a, e))
-                    - LinExpr.var(starts.xi(b, e))
-                    - tx_b
-                    + big_m * sigma
-                    + big_m * both
-                    >= 0
-                ).named(f"link-b[{a},{b},{e}]")
+        for a, b, e in ctx.reductions.link_triples:
+            tx_a = data.transmission_time(a, e)
+            tx_b = data.transmission_time(b, e)
+            big_m = max(
+                data.limit(a.request_id) + tx_a, data.limit(b.request_id) + tx_b
+            )
+            sigma = LinExpr.var(aux.sigma(a, b, e))
+            both = 2 - routing.chi(a, e) - routing.chi(b, e)
+            # (18) ξ_b − ξ_a − D_a + M(1 − σ) + M(2 − χ_a − χ_b) ≥ 0
+            yield (
+                LinExpr.var(starts.xi(b, e))
+                - LinExpr.var(starts.xi(a, e))
+                - tx_a
+                + big_m * (1 - sigma)
+                + big_m * both
+                >= 0
+            ).named(f"link-a[{a},{b},{e}]")
+            # (19) ξ_a − ξ_b − D_b + M σ + M(2 − χ_a − χ_b) ≥ 0
+            yield (
+                LinExpr.var(starts.xi(a, e))
+                - LinExpr.var(starts.xi(b, e))
+                - tx_b
+                + big_m * sigma
+                + big_m * both
+                >= 0
+            ).named(f"link-b[{a},{b},{e}]")

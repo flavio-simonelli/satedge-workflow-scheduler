@@ -9,6 +9,10 @@ Equations (8)–(10) of the document. For each pair ``(i, j)`` of tasks of diffe
 
 The big-M of the pair is the larger time limit of the two requests, as in the document. The
 auxiliary variables belong to this block: no other block reads them.
+
+Reduction 2: the pairs and the windows are those of the reductions. (8) is written only on the
+windows where the two tasks can be at the same time, and a pair with no such window has no
+variable and no row: the two tasks can never overlap.
 """
 
 from __future__ import annotations
@@ -52,25 +56,24 @@ class TaskOverlapBlock(ConstraintBlock[OverlapVariables]):
     def variables(self, ctx: BuildContext, sink: ModelSink) -> OverlapVariables:
         same: dict[Pair, Var] = {}
         order: dict[Pair, Var] = {}
-        for i, j in ctx.data.task_pairs:
+        for i, j in ctx.reductions.task_pairs:
             same[(i, j)] = sink.add_var(0.0, 1.0, VarKind.CONTINUOUS, f"same[{i},{j}]")
             order[(i, j)] = sink.add_var(0.0, 1.0, VarKind.BINARY, f"order[{i},{j}]")
         return OverlapVariables(same, order)
 
     def rows(self, ctx: BuildContext, aux: OverlapVariables) -> Iterator[Row]:
         variables = ctx.variables
-        for i, j in ctx.data.task_pairs:
+        for i, j in ctx.reductions.task_pairs:
             big_m = max(ctx.data.limit(i.request_id), ctx.data.limit(j.request_id))
             same = LinExpr.var(aux.same[(i, j)])
             order = LinExpr.var(aux.order[(i, j)])
 
-            # (8) same ≥ u_{i,s,w} + u_{j,s,w} − 1, for every window of every satellite
-            for s in ctx.data.satellites:
-                for w in range(len(ctx.data.hpc_windows(s))):
-                    shared = LinExpr.var(variables.u(i, s, w)) + LinExpr.var(
-                        variables.u(j, s, w)
-                    )
-                    yield (same >= shared - 1).named(f"same[{i},{j},{s},{w}]")
+            # (8) same ≥ u_{i,s,w} + u_{j,s,w} − 1, on the windows both can share
+            for s, w in ctx.reductions.shared_windows(i, j):
+                shared = LinExpr.var(variables.u(i, s, w)) + LinExpr.var(
+                    variables.u(j, s, w)
+                )
+                yield (same >= shared - 1).named(f"same[{i},{j},{s},{w}]")
 
             # (9) t_j ≥ t_i + busy_i − M(1 − order) − M(1 − same)
             yield (

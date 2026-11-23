@@ -11,7 +11,8 @@ construction.
   λ_e) χ_{a,e} ≤ Σ_h ℓ^e_{e,h} ν_{a,e,h}``, where ``ℓ^e_{e,h}`` is the end of the window ``h``.
 
 The window is the one with ``ν_{a,e,h} = 1``. Both sums have no big-M: the variables ``ν``
-select the window, and each constraint refers only to the window chosen.
+select the window, and each constraint refers only to the window chosen. The sums run on the
+compatible windows, and the arcs are those that ``a`` can cross (reduction 3).
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ class LinkWindowBlock(ConstraintBlock):
         starts = ctx.families.get(TransmissionStarts)
         routing = ctx.families.get(RoutingVariables)
         for a in data.data:
-            for e in data.arc_ids:
+            for e in ctx.reductions.arcs(a):
                 windows = data.link_windows(e)
                 if windows is None:
                     continue
@@ -62,11 +63,12 @@ class LinkWindowBlock(ConstraintBlock):
         chi = routing.chi(a, e)
         time_e = ctx.data.transmission_time(a, e) + ctx.data.latency(e)
 
+        used = routing.link_windows(a, e)
         opening = LinExpr.total(
-            w.start * LinExpr.var(routing.nu(a, e, h)) for h, w in enumerate(windows)
+            windows.windows[h].start * LinExpr.var(routing.nu(a, e, h)) for h in used
         )
         closing = LinExpr.total(
-            w.end * LinExpr.var(routing.nu(a, e, h)) for h, w in enumerate(windows)
+            windows.windows[h].end * LinExpr.var(routing.nu(a, e, h)) for h in used
         )
         # (17b) Σ_h ℓ^s_{e,h} ν_{a,e,h} ≤ ξ_{a,e}
         yield (opening <= xi).named(f"open[{a},{e}]")

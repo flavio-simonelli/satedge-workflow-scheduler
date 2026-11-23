@@ -1,9 +1,10 @@
 """The data of the model: the sets and the parameters of the notation, read from an instance.
 
 :class:`ModelData` translates the instance into the notation of the document: the tasks and
-the data of all the requests, committed and new, the committed calendar, the arcs, the windows, the durations, the sizes and the costs. It
-holds data only, and nothing about variables, constraints or solvers. The blocks read it, and
-never read the instance directly.
+the data of all the requests, committed and new, the committed calendar, the arcs, the windows,
+the durations, the sizes, the costs and the a priori time bounds of the requests. It holds data
+only, and nothing about variables, constraints or solvers. The blocks read it, and never read the
+instance directly.
 
 Tasks and data are identified by keys, not by integers, so that a block can say ``(i, s)`` and
 read as the document does:
@@ -23,6 +24,7 @@ from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.network import Arc
 from satedge_workflow_scheduler.domain.nodes import NodeId
 from satedge_workflow_scheduler.domain.requests import Request
+from satedge_workflow_scheduler.scheduling.bounds import RequestBounds, request_bounds
 from satedge_workflow_scheduler.scheduling.deadline import (
     DeadlineMode,
     delivery_limit,
@@ -35,6 +37,7 @@ from satedge_workflow_scheduler.scheduling.objective import (
     response_epsilon,
     tardiness_weights,
 )
+from satedge_workflow_scheduler.scheduling.screening import unrealizable_reason
 from satedge_workflow_scheduler.scheduling.windows import arc_windows
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
 
@@ -112,6 +115,7 @@ class ModelData:
         self._requests = {r.id: r for r in instance.requests}
         self._committed = instance.committed.request_ids
         self._delays: dict[tuple[NodeId, float], Mapping[NodeId, float]] = {}
+        self._bounds: dict[str, RequestBounds] = {}
         self._arc_of = {
             (arc.source, arc.target): e for e, arc in enumerate(instance.network.arcs)
         }
@@ -218,6 +222,12 @@ class ModelData:
             for k in range(len(self._request(rid).tasks))
         )
 
+    def tasks_of(self, request_id: str) -> tuple[TaskKey, ...]:
+        """The real tasks of one request, in pipeline order."""
+        return tuple(
+            TaskKey(request_id, k) for k in range(len(self._request(request_id).tasks))
+        )
+
     @property
     def task_pairs(self) -> tuple[tuple[TaskKey, TaskKey], ...]:
         """The pairs ``Q`` of tasks of different requests, ``(i, j)`` with ``i`` before ``j``.
@@ -261,6 +271,13 @@ class ModelData:
             DataKey(rid, k)
             for rid in self.request_ids
             for k in range(len(self._request(rid).tasks) + 1)
+        )
+
+    def data_of(self, request_id: str) -> tuple[DataKey, ...]:
+        """The data of one request: its raw data, its intermediate data and its final output."""
+        return tuple(
+            DataKey(request_id, k)
+            for k in range(len(self._request(request_id).tasks) + 1)
         )
 
     @property
@@ -425,6 +442,43 @@ class ModelData:
     def plan_release(self, satellite: NodeId) -> float:
         """``b^plan_s``: instant from which the new plan reaches ``satellite``."""
         return self._instance.release_of(satellite)
+
+    def departure_release(self, node: NodeId) -> float:
+        """``b^plan_u`` of the tail ``u`` of an arc: when the new plan lets data leave ``node``.
+
+        The ground station has no plan release: it is 0 there."""
+        if node not in self.satellites:
+            return 0.0
+        return self.plan_release(node)
+
+    # --- a priori bounds ------------------------------------------------------------------
+
+    def bounds(self, request_id: str) -> RequestBounds:
+        """``EA``, ``LA``, ``ES`` and ``LC`` of a new request, alone in the network.
+
+        The bounds of the section "Limiti temporali a priori" of the document, for the time limit
+        ``τ̂_r`` of the deadline mode. Each request is computed once, when first asked.
+
+        Raises:
+            ModelBuildError: If the request is committed: its bounds are the values of its
+                calendar, not those of a relaxation.
+        """
+        if self.is_committed(request_id):
+            raise ModelBuildError(
+                f"request {request_id} is committed: its calendar gives its bounds"
+            )
+        if request_id not in self._bounds:
+            self._bounds[request_id] = request_bounds(
+                self._instance, self._request(request_id), self.limit(request_id)
+            )
+        return self._bounds[request_id]
+
+    def unrealizable_reason(self, request_id: str) -> str | None:
+        """Why the new request can never be delivered by its time limit, or ``None`` if it may
+        be (section "Richieste impossibili" of the document)."""
+        return unrealizable_reason(
+            self._request(request_id), self._instance, self.limit(request_id)
+        )
 
     @property
     def plmm_big_m(self) -> float:

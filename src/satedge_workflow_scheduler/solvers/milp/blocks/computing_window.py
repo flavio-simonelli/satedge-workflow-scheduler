@@ -7,7 +7,8 @@ nothing to check. What remains:
 - (7): the task, its busy time included, ends before the end of its window.
 
 The window of a task is chosen by the variables ``u_{i,s,w}``, which the assignment (2) makes
-sum to one: the sums over the windows below pick the bounds of the window actually used.
+sum to one: the sums over the windows below pick the bounds of the window actually used. The sums
+run on the windows that have a variable (reduction 1).
 """
 
 from __future__ import annotations
@@ -35,8 +36,10 @@ class ComputingWindowBlock(ConstraintBlock):
             starts = LinExpr()
             ends = LinExpr()
             for s in ctx.data.satellites:
-                for w, window in enumerate(ctx.data.hpc_windows(s)):
+                windows = ctx.data.hpc_windows(s).windows
+                for w in variables.windows(i, s):
                     chosen = variables.u(i, s, w)
+                    window = windows[w]
                     starts += LinExpr.var(chosen, window.start)
                     ends += LinExpr.var(chosen, window.end)
             yield (LinExpr.var(variables.t(i)) >= starts).named(f"window_start[{i}]")

@@ -12,6 +12,10 @@ equations describe a path that starts where the producer is and ends where the c
 
 Under soft deadlines no request is rejected, so (13) is ``χ ≤ 1``, which the binary domain
 already gives: the block does not write it.
+
+Reduction 3: ``χ_{a,e}`` exists only on the arcs that ``a`` can cross, and ``ν_{a,e,h}`` only on
+the compatible windows. Elsewhere ``χ_{a,e}`` is the constant 0, and every block that writes a
+constraint on the transmission of ``a`` on ``e`` writes it only where ``χ_{a,e}`` exists.
 """
 
 from __future__ import annotations
@@ -39,28 +43,37 @@ class RoutingVariables:
 
     Attributes:
         crossed: ``χ_{a,e}`` as a variable, by data and arc, on the arcs always available.
-        windows: ``ν_{a,e,·}``, by data and arc, on the arcs with visibility windows.
+        windows: ``ν_{a,e,h}``, by data and arc, then by the position of the window, on the arcs
+            with visibility windows: only the compatible windows.
+        removed: The pairs of data and arc that the reductions removed: ``χ_{a,e}`` is 0.
     """
 
     crossed: Mapping[tuple[DataKey, ArcId], Var]
-    windows: Mapping[tuple[DataKey, ArcId], tuple[Var, ...]]
+    windows: Mapping[tuple[DataKey, ArcId], Mapping[int, Var]]
+    removed: frozenset[tuple[DataKey, ArcId]] = frozenset()
 
     def chi(self, a: DataKey, arc: ArcId) -> LinExpr:
         """``χ_{a,e}``: the variable on an arc always available, the sum of the ``ν`` on an arc
-        with windows (17a)."""
+        with windows (17a), the constant 0 on an arc that ``a`` cannot cross."""
         if (a, arc) in self.crossed:
             return LinExpr.var(self.crossed[(a, arc)])
+        if (a, arc) in self.removed:
+            return LinExpr.number(0.0)
         windows = self._windows(a, arc, "chi")
-        return LinExpr.total(LinExpr.var(nu) for nu in windows)
+        return LinExpr.total(LinExpr.var(nu) for nu in windows.values())
+
+    def link_windows(self, a: DataKey, arc: ArcId) -> tuple[int, ...]:
+        """The windows of ``arc`` that have a variable ``ν_{a,e,h}``, in order."""
+        return tuple(self._windows(a, arc, "nu"))
 
     def nu(self, a: DataKey, arc: ArcId, window: int) -> Var:
         """``ν_{a,e,h}``: 1 if the transmission of ``a`` on ``arc`` is in the window ``h``."""
         windows = self._windows(a, arc, "nu")
-        if not 0 <= window < len(windows):
+        if window not in windows:
             raise ModelBuildError(f"variable nu[{a},{arc},{window}] does not exist")
         return windows[window]
 
-    def _windows(self, a: DataKey, arc: ArcId, family: str) -> tuple[Var, ...]:
+    def _windows(self, a: DataKey, arc: ArcId, family: str) -> Mapping[int, Var]:
         try:
             return self.windows[(a, arc)]
         except KeyError:
@@ -78,21 +91,24 @@ class PathBlock(ConstraintBlock[RoutingVariables]):
     provides = frozenset({"chi", "nu"})
 
     def variables(self, ctx: BuildContext, sink: ModelSink) -> RoutingVariables:
+        data, reductions = ctx.data, ctx.reductions
         crossed: dict[tuple[DataKey, ArcId], Var] = {}
-        windows: dict[tuple[DataKey, ArcId], tuple[Var, ...]] = {}
-        for a in ctx.data.data:
-            for e in ctx.data.arc_ids:
-                link_windows = ctx.data.link_windows(e)
-                if link_windows is None:
+        windows: dict[tuple[DataKey, ArcId], dict[int, Var]] = {}
+        removed: set[tuple[DataKey, ArcId]] = set()
+        for a in data.data:
+            for e in data.arc_ids:
+                if not reductions.crosses(a, e):
+                    removed.add((a, e))
+                elif data.link_windows(e) is None:
                     crossed[(a, e)] = sink.add_var(
                         0.0, 1.0, VarKind.BINARY, f"chi[{a},{e}]"
                     )
                 else:
-                    windows[(a, e)] = tuple(
-                        sink.add_var(0.0, 1.0, VarKind.BINARY, f"nu[{a},{e},{h}]")
-                        for h in range(len(link_windows))
-                    )
-        return RoutingVariables(crossed, windows)
+                    windows[(a, e)] = {
+                        h: sink.add_var(0.0, 1.0, VarKind.BINARY, f"nu[{a},{e},{h}]")
+                        for h in reductions.link_windows(a, e)
+                    }
+        return RoutingVariables(crossed, windows, frozenset(removed))
 
     def rows(self, ctx: BuildContext, aux: RoutingVariables) -> Iterator[Row]:
         data = ctx.data
@@ -117,7 +133,7 @@ class PathBlock(ConstraintBlock[RoutingVariables]):
         if not data.may_reject():
             return
         for a in data.data:
-            for e in data.arc_ids:
+            for e in ctx.reductions.arcs(a):
                 # (13) χ_{a,e} ≤ 1 − ρ_{reqof(a)}
                 yield (aux.chi(a, e) <= 1 - variables.rejection(a.request_id)).named(
                     f"rejected[{a},{e}]"

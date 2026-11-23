@@ -21,6 +21,7 @@ from satedge_workflow_scheduler.solvers.milp.blocks.base import (
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
 from satedge_workflow_scheduler.solvers.milp.expr import Row, Var
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
+from satedge_workflow_scheduler.solvers.milp.reductions import Reductions
 from satedge_workflow_scheduler.solvers.milp.variables import (
     DECISION_FAMILIES,
     DecisionVariables,
@@ -51,6 +52,7 @@ class BuiltModel:
 
     Attributes:
         variables: The decision variables, shared by the blocks.
+        reductions: Which variables and constraints the model contains.
         rows: Number of rows written by each block, keyed by the name of the block, in the
             order the blocks were built.
         families: The auxiliary variables created by the blocks, by type.
@@ -58,6 +60,7 @@ class BuiltModel:
     """
 
     variables: DecisionVariables
+    reductions: Reductions
     rows: Mapping[str, int] = field(default_factory=dict)
     families: Families = field(default_factory=Families)
     binaries: tuple[Var, ...] = ()
@@ -69,11 +72,17 @@ class ModelBuilder:
     Args:
         data: The data of the model.
         sink: Where the variables and the rows go.
+        reductions: Which variables and constraints the model contains; all of them by default.
     """
 
-    def __init__(self, data: ModelData, sink: ModelSink) -> None:
+    def __init__(
+        self, data: ModelData, sink: ModelSink, reductions: Reductions | None = None
+    ) -> None:
         self._data = data
         self._sink = sink
+        self._reductions = (
+            reductions if reductions is not None else Reductions.none(data)
+        )
 
     def build(self, blocks: Sequence[ConstraintBlock[Any]]) -> BuiltModel:
         """Check the blocks, then write them in order.
@@ -84,14 +93,16 @@ class ModelBuilder:
         """
         _check_formulation(blocks)
         tracking = _TrackingSink(self._sink)
-        variables = create_decision_variables(tracking, self._data)
+        variables = create_decision_variables(tracking, self._data, self._reductions)
         families = Families()
-        context = BuildContext(self._data, variables, families)
+        context = BuildContext(self._data, variables, self._reductions, families)
 
         rows: dict[str, int] = {}
         for block in blocks:
             rows[block.name] = block.build(context, tracking)
-        return BuiltModel(variables, rows, families, tuple(tracking.binaries))
+        return BuiltModel(
+            variables, self._reductions, rows, families, tuple(tracking.binaries)
+        )
 
 
 def _check_formulation(blocks: Sequence[ConstraintBlock[Any]]) -> None:

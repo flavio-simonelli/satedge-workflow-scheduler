@@ -90,7 +90,9 @@ class MilpConfig:
     Attributes:
         level: The level of the model. The levels add blocks; see :class:`Level`.
         deadline: Hard deadlines (requests may be rejected) or soft ones (all are served).
-        reductions: Whether the exact reductions of section 6 (rules 1 to 6) are applied.
+        reductions: Whether the exact reductions of section 6 (rules 1 to 5) are applied: the
+            variables and constraints that no feasible solution needs are not written
+            (:mod:`.reductions`). Rule 6 holds in every model. They do not change the optimum.
         strengthening: The optional strengthenings.
         lazy: The groups of constraints added lazily, only where a solution violates them. Empty
             by default: every constraint is in the model from the start.

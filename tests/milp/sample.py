@@ -132,4 +132,5 @@ def build(
     data = ModelData(instance if instance is not None else sample_instance(), mode)
     backend = FakeRecordingBackend()
     model = ModelBuilder(data, backend).build(blocks)
-    return Built(BuildContext(data, model.variables, model.families), backend, model)
+    context = BuildContext(data, model.variables, model.reductions, model.families)
+    return Built(context, backend, model)

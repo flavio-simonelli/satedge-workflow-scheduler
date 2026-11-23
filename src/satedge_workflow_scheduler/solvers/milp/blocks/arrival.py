@@ -50,6 +50,8 @@ class ArrivalBlock(ConstraintBlock):
             return
         for v in data.satellites:
             for e in data.incoming(v):
+                if not ctx.reductions.crosses(a, e):
+                    continue
                 time_e = data.transmission_time(a, e) + data.latency(e)
                 big_m = data.limit(a.request_id) + time_e
                 yield (
@@ -74,6 +76,8 @@ class ArrivalBlock(ConstraintBlock):
         ground = data.ground_station
         limit = data.limit(a.request_id)
         for e in data.incoming(ground):
+            if not ctx.reductions.crosses(a, e):
+                continue
             time_e = data.transmission_time(a, e) + data.latency(e)
             yield (
                 (limit + time_e * (1 - routing.chi(a, e)))

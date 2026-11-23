@@ -15,7 +15,8 @@ on a solution. Adding one means writing that class and making its blocks accept 
 their keys; the loop does not change.
 
 Each round builds a new model instead of adding rows to the previous one: the builder stays
-simple, and the solver restarts its search in either case.
+simple, and the solver restarts its search in either case. The reductions of the configuration
+(:mod:`.reductions`) depend on the data only, so a solve computes them once, for all its rounds.
 """
 
 from __future__ import annotations
@@ -53,6 +54,10 @@ from satedge_workflow_scheduler.solvers.milp.formulation_factory import (
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
 from satedge_workflow_scheduler.solvers.milp.objective import objective
 from satedge_workflow_scheduler.solvers.milp.polish import polish
+from satedge_workflow_scheduler.solvers.milp.reductions import (
+    Reductions,
+    reductions_for,
+)
 from satedge_workflow_scheduler.solvers.priority_edf_eft.solver import (
     PriorityEdfEftSolver,
 )
@@ -113,14 +118,15 @@ def warm_start_of(
 def solve_once(
     instance: ProblemInstance,
     data: ModelData,
+    reductions: Reductions,
     config: MilpConfig,
     backend: BackendFactory,
     restricted: Restricted | None,
     params: SolveParams,
     start: Schedule | None = None,
 ) -> Solution:
-    """Build the model, with the lazy groups of ``restricted`` on their keys only, give it the
-    starting calendar ``start`` if there is one, solve it once, and decode it.
+    """Build the model with ``reductions``, with the lazy groups of ``restricted`` on their keys
+    only, give it the starting calendar ``start`` if there is one, solve it once, and decode it.
 
     Raises:
         InfeasibleModelError: If the solver proves that the model has no solution.
@@ -128,8 +134,8 @@ def solve_once(
     """
     sink = backend()
     blocks = blocks_for(config, online=data.is_online, restricted=restricted)
-    model = ModelBuilder(data, sink).build(blocks)
-    context = BuildContext(data, model.variables, model.families)
+    model = ModelBuilder(data, sink, reductions).build(blocks)
+    context = BuildContext(data, model.variables, model.reductions, model.families)
     sink.set_objective(dict(objective(context).terms))
     if start is not None:
         sink.set_start(encode(data, model, start))
@@ -154,8 +160,18 @@ class DirectSolve:
         config: MilpConfig,
         backend: BackendFactory,
     ) -> Solution:
+        """The solution of ``instance``.
+
+        Raises:
+            InfeasibleModelError: If the model has no solution, or if the reductions prove
+                that some request can never be served under soft deadlines.
+            SolverError: If the solver fails or stops without a valid solution.
+        """
+        reductions = reductions_for(data, config.reductions)
         start = warm_start_of(instance, data, config)
-        return solve_once(instance, data, config, backend, None, config.solve, start)
+        return solve_once(
+            instance, data, reductions, config, backend, None, config.solve, start
+        )
 
 
 class LazyConstraint(Protocol):
@@ -215,11 +231,13 @@ class LazySolve:
         relaxation of it.
 
         Raises:
-            InfeasibleModelError: If a round has no solution.
+            InfeasibleModelError: If a round has no solution, or if the reductions prove that
+                some request can never be served under soft deadlines.
             SolverError: If the solver fails, if the time ends before a solution that violates
                 nothing, or if a group is still violated where its constraints are written.
         """
         started = time.monotonic()
+        reductions = reductions_for(data, config.reductions)
         start = warm_start_of(instance, data, config)
         written: dict[LazyGroup, frozenset[Any]] = {
             c.group: frozenset() for c in self._constraints
@@ -230,7 +248,7 @@ class LazySolve:
             self.rounds = tuple(rounds)
             params = _remaining(config.solve, started)
             solution = solve_once(
-                instance, data, config, backend, written, params, start
+                instance, data, reductions, config, backend, written, params, start
             )
             violated = {
                 c.group: c.violations(instance, solution) for c in self._constraints

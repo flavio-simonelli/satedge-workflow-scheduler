@@ -9,6 +9,10 @@ the requests that are not in the calendar are rejected.
 The auxiliary variables of the blocks (the order of the PLMM, its flows, the delivery) are not
 set: a calendar does not determine them, and the solver completes them. The encoding is therefore
 a partial assignment, which is what a warm start accepts.
+
+Only the variables of the model get a value: those that the reductions keep. A feasible calendar
+uses only those, since the reductions remove what no feasible solution uses; a calendar that needs
+a removed variable is not a calendar of this model, and the encoding refuses it.
 """
 
 from __future__ import annotations
@@ -42,8 +46,9 @@ def encode(
     of the calendar is served.
 
     Raises:
-        ModelBuildError: If an execution or a transmission lies in no window of its resource,
-            so the calendar is not a calendar of this model.
+        ModelBuildError: If an execution or a transmission lies in no window of its resource, or
+            in a window or on an arc that the reductions removed, so the calendar is not a
+            calendar of this model.
     """
     variables = model.variables
     values: dict[Var, float] = {}
@@ -55,16 +60,19 @@ def encode(
     for i in data.tasks:
         values[variables.t(i)] = 0.0
         for s in data.satellites:
-            for w in range(len(data.hpc_windows(s))):
+            for w in variables.windows(i, s):
                 values[variables.u(i, s, w)] = 0.0
     for execution in schedule.executions:
         i = TaskKey(execution.request_id, execution.task_index)
+        what = f"execution of {i} on {execution.satellite}"
         window = _window_containing(
             data.hpc_windows(execution.satellite),
             execution.start,
             execution.end,
-            f"execution of {i} on {execution.satellite}",
+            what,
         )
+        if window not in variables.windows(i, execution.satellite):
+            raise ModelBuildError(f"{what} is in a window the reductions removed")
         values[variables.u(i, execution.satellite, window)] = 1.0
         values[variables.t(i)] = execution.start
 
@@ -81,16 +89,19 @@ def _encode_routing(
 ) -> None:
     routing = model.families.get(RoutingVariables)
     starts = model.families.get(TransmissionStarts)
-    for a in data.data:
-        for e in data.arc_ids:
-            if (a, e) in routing.crossed:
-                values[routing.crossed[(a, e)]] = 0.0
-            for h in range(len(routing.windows.get((a, e), ()))):
-                values[routing.nu(a, e, h)] = 0.0
-            values[starts.xi(a, e)] = 0.0
+    for var in routing.crossed.values():
+        values[var] = 0.0
+    for by_window in routing.windows.values():
+        for var in by_window.values():
+            values[var] = 0.0
+    for var in starts.start.values():
+        values[var] = 0.0
     for transfer in schedule.transfers:
         a = DataKey(transfer.request_id, transfer.data_index)
         e = data.arc_between(transfer.source, transfer.target)
+        what = f"transmission of {a} on arc {e}"
+        if (a, e) in routing.removed:
+            raise ModelBuildError(f"{what} is on an arc the reductions removed")
         values[starts.xi(a, e)] = transfer.start
         windows = data.link_windows(e)
         if windows is None:
@@ -98,9 +109,9 @@ def _encode_routing(
             continue
         # the window must contain the transmission and the latency, as in (17b)–(17c)
         end = transfer.end + data.latency(e)
-        window = _window_containing(
-            windows, transfer.start, end, f"transmission of {a} on arc {e}"
-        )
+        window = _window_containing(windows, transfer.start, end, what)
+        if window not in routing.link_windows(a, e):
+            raise ModelBuildError(f"{what} is in a window the reductions removed")
         values[routing.nu(a, e, window)] = 1.0
 
 

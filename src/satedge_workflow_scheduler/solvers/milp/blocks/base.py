@@ -5,6 +5,11 @@ variables it needs and provides. It writes its rows through :meth:`ConstraintBlo
 may create variables first, in :meth:`ConstraintBlock.variables`. The template method
 :meth:`ConstraintBlock.build` runs both, in order, and registers the variables in
 :class:`Families`, so that the blocks that follow can read them by their type.
+
+A block writes its constraints only on what exists: the keys that the
+:class:`~satedge_workflow_scheduler.solvers.milp.reductions.Reductions` of the context keep. A row
+left with no variable once the missing ones are zero is a constant: the template method drops it
+if it holds, and fails if it does not, so no block has to test for it.
 """
 
 from __future__ import annotations
@@ -16,8 +21,9 @@ from typing import ClassVar, cast, final
 
 from satedge_workflow_scheduler.solvers.milp.backends.ports import ModelSink
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
-from satedge_workflow_scheduler.solvers.milp.expr import Row
+from satedge_workflow_scheduler.solvers.milp.expr import Row, screen_empty_rows
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
+from satedge_workflow_scheduler.solvers.milp.reductions import Reductions
 from satedge_workflow_scheduler.solvers.milp.variables import DecisionVariables
 
 
@@ -59,11 +65,13 @@ class BuildContext:
     Attributes:
         data: The data of the model, in the notation of the document.
         variables: The decision variables, shared by the blocks.
+        reductions: Which variables and constraints the model contains.
         families: The auxiliary variables created by the earlier blocks.
     """
 
     data: ModelData
     variables: DecisionVariables
+    reductions: Reductions
     families: Families = field(default_factory=Families)
 
 
@@ -124,10 +132,14 @@ class ConstraintBlock[A = None](ABC):
 
     @final
     def build(self, ctx: BuildContext, sink: ModelSink) -> int:
-        """Create the auxiliary variables, register them, write the rows, and return how many."""
+        """Create the auxiliary variables, register them, write the rows, and return how many.
+
+        Raises:
+            ModelBuildError: If a row has no variable and does not hold.
+        """
         aux = self.variables(ctx, sink)
         if aux is not None:
             ctx.families.add(aux)
-        rows = list(self.rows(ctx, aux))
+        rows = list(screen_empty_rows(self.rows(ctx, aux)))
         sink.add_rows(rows)
         return len(rows)

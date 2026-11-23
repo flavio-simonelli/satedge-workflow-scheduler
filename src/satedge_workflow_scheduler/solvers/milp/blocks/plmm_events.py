@@ -14,6 +14,10 @@ decrease. Each data item ``a`` occupies the memory at the events ``k`` where ``o
 The occupations ``ζ⁺`` and ``ζ⁻`` are those of the common block (20)–(21), read through ``occ``.
 This formulation has no order variable and no flow, but it has big-M constraints for each triple
 (data, satellite, event), so it is the one the document compares with the flow.
+
+Reduction 5: the PLMM of ``v`` holds only the data that can be in it, so it has one event per such
+data item, and the block is written only on the satellites whose PLMM can be filled beyond its
+capacity.
 """
 
 from __future__ import annotations
@@ -58,26 +62,27 @@ class PlmmEventsBlock(OnSubset[NodeId], ConstraintBlock[EventVariables]):
     requires = frozenset({"rejection", "u", "chi", "occ"})
 
     def variables(self, ctx: BuildContext, sink: ModelSink) -> EventVariables:
-        data = ctx.data
-        count = len(data.data)
+        data, reductions = ctx.data, ctx.reductions
+        satellites = self.chosen(reductions.plmm_satellites)
         capacity = data.plmm_big_m
         date = {
             (v, k): sink.add_var(0.0, capacity, VarKind.CONTINUOUS, f"tau[{v},{k}]")
-            for v in self.chosen(data.satellites)
-            for k in range(count)
+            for v in satellites
+            for k in range(len(reductions.plmm_data(v)))
         }
         on = {
             (a, v, k): sink.add_var(0.0, 1.0, VarKind.BINARY, f"o[{a},{v},{k}]")
             for a in data.data
-            for v in self.chosen(data.satellites)
-            for k in range(count)
+            for v in satellites
+            if reductions.in_plmm(a, v)
+            for k in range(len(reductions.plmm_data(v)))
         }
         return EventVariables(date, on)
 
     def rows(self, ctx: BuildContext, aux: EventVariables) -> Iterator[Row]:
-        data = ctx.data
+        data, reductions = ctx.data, ctx.reductions
         occupation = ctx.families.get(PlmmOccupation)
-        count = len(data.data)
+        satellites = self.chosen(reductions.plmm_satellites)
         big_m = data.plmm_big_m
 
         def on(a: DataKey, v: NodeId, k: int) -> LinExpr:
@@ -87,13 +92,16 @@ class PlmmEventsBlock(OnSubset[NodeId], ConstraintBlock[EventVariables]):
         def date(v: NodeId, k: int) -> LinExpr:
             return LinExpr.var(aux.date[(v, k)])
 
-        for v in self.chosen(data.satellites):
+        for v in satellites:
             # dates of the events do not decrease
-            for k in range(count - 1):
+            for k in range(len(reductions.plmm_data(v)) - 1):
                 yield (date(v, k + 1) - date(v, k) >= 0).named(f"event-order[{v},{k}]")
 
         for a in data.data:
-            for v in self.chosen(data.satellites):
+            for v in satellites:
+                if not reductions.in_plmm(a, v):
+                    continue
+                count = len(reductions.plmm_data(v))
                 q = presence(ctx, a, v)
                 start = LinExpr.var(occupation.start[(a, v)])
                 end = LinExpr.var(occupation.end[(a, v)])
@@ -135,8 +143,9 @@ class PlmmEventsBlock(OnSubset[NodeId], ConstraintBlock[EventVariables]):
                         >= 0
                     ).named(f"end[{a},{v},{k}]")
 
-        for v in self.chosen(data.satellites):
-            for k in range(count):
+        for v in satellites:
+            members = reductions.plmm_data(v)
+            for k in range(len(members)):
                 # (capacity) Σ_a d_a o_{a,v,k} ≤ K_v
-                used = LinExpr.total(data.size(a) * on(a, v, k) for a in data.data)
+                used = LinExpr.total(data.size(a) * on(a, v, k) for a in members)
                 yield (used <= data.plmm_capacity(v)).named(f"capacity[{v},{k}]")

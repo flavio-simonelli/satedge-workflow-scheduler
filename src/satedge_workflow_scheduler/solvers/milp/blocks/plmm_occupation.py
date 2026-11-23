@@ -10,6 +10,10 @@ occupation of the PLMM of ``v`` by the data ``a`` is an interval ``[ζ⁺_{a,v},
 
 The formulation of the capacity follows: the flow (:mod:`.plmm_flow`) or the events
 (:mod:`.plmm_events`). Both read the interval through the family ``occ``.
+
+Reduction 5: the occupations exist only for the data that can be in the PLMM, and only on the
+satellites whose PLMM can be filled beyond its capacity; the arcs are those the data can cross.
+The lazy strategy may restrict the satellites further.
 """
 
 from __future__ import annotations
@@ -58,9 +62,7 @@ class PlmmOccupationBlock(OnSubset[NodeId], ConstraintBlock[PlmmOccupation]):
 
     def variables(self, ctx: BuildContext, sink: ModelSink) -> PlmmOccupation:
         capacity = ctx.data.plmm_big_m
-        slots = [
-            (a, v) for a in ctx.data.data for v in self.chosen(ctx.data.satellites)
-        ]
+        slots = _slots(ctx, self.chosen(ctx.reductions.plmm_satellites))
         start = {
             (a, v): sink.add_var(0.0, capacity, VarKind.CONTINUOUS, f"occs[{a},{v}]")
             for a, v in slots
@@ -72,14 +74,17 @@ class PlmmOccupationBlock(OnSubset[NodeId], ConstraintBlock[PlmmOccupation]):
         return PlmmOccupation(start, end)
 
     def rows(self, ctx: BuildContext, aux: PlmmOccupation) -> Iterator[Row]:
-        data, variables = ctx.data, ctx.variables
+        data, variables, reductions = ctx.data, ctx.variables, ctx.reductions
         starts = ctx.families.get(TransmissionStarts)
         routing = ctx.families.get(RoutingVariables)
         big_m = data.plmm_big_m
+        satellites = self.chosen(reductions.plmm_satellites)
         for a in data.data:
             producer = data.producer(a)
             consumer = data.consumer(a)
-            for v in self.chosen(data.satellites):
+            for v in satellites:
+                if (a, v) not in aux.start:
+                    continue
                 start = LinExpr.var(aux.start[(a, v)])
                 end = LinExpr.var(aux.end[(a, v)])
                 if producer is not None:
@@ -103,6 +108,8 @@ class PlmmOccupationBlock(OnSubset[NodeId], ConstraintBlock[PlmmOccupation]):
                         >= 0
                     ).named(f"end-consumed[{a},{v}]")
                 for e in data.incoming(v):
+                    if not reductions.crosses(a, e):
+                        continue
                     # (20c) ζ⁺_{a,v} ≤ ξ_{a,e} + λ_e + M^P(1 − χ_{a,e})
                     yield (
                         LinExpr.var(starts.xi(a, e))
@@ -112,6 +119,8 @@ class PlmmOccupationBlock(OnSubset[NodeId], ConstraintBlock[PlmmOccupation]):
                         >= 0
                     ).named(f"start-received[{a},{e},{v}]")
                 for e in data.outgoing(v):
+                    if not reductions.crosses(a, e):
+                        continue
                     # (21b) ζ⁻_{a,v} ≥ ξ_{a,e} + D_{a,e} − M^P(1 − χ_{a,e})
                     yield (
                         end
@@ -122,7 +131,17 @@ class PlmmOccupationBlock(OnSubset[NodeId], ConstraintBlock[PlmmOccupation]):
                     ).named(f"end-sent[{a},{e},{v}]")
             # (20b) ζ⁺_{a,v} ≤ b_r for the raw data, on its origin
             origin = data.origin(a.request_id)
-            if producer is None and origin in self.chosen(data.satellites):
+            if producer is None and (a, origin) in aux.start:
                 yield (
                     LinExpr.var(aux.start[(a, origin)]) <= data.release(a.request_id)
                 ).named(f"start-raw[{a}]")
+
+
+def _slots(ctx: BuildContext, satellites: tuple[NodeId, ...]) -> list[Occupation]:
+    """The occupations of the model on ``satellites``: the data that can be in each PLMM."""
+    return [
+        (a, v)
+        for a in ctx.data.data
+        for v in satellites
+        if ctx.reductions.in_plmm(a, v)
+    ]

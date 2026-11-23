@@ -68,6 +68,8 @@ class DeliveryBlock(ConstraintBlock[DeliveryTimes]):
         for request_id in data.request_ids:
             final = data.final_data(request_id)
             for e in data.incoming(data.ground_station):
+                if not ctx.reductions.crosses(final, e):
+                    continue
                 time_e = data.transmission_time(final, e) + data.latency(e)
                 # δ_r − ξ_{a,e} − (D + λ) χ_{a,e} ≥ 0
                 yield (

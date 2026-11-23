@@ -16,13 +16,16 @@ from satedge_workflow_scheduler.solvers.milp.model_data import DataKey, TaskKey
 
 def test_hard_deadlines_write_flow_ends_and_rejection_rows() -> None:
     built = build([PathBlock()])
-    # 5 data, 3 nodes (S1, S2, G), 3 arcs: 15 flow rows, 30 ends rows, 15 rejection rows
-    assert built.model.rows["path"] == 60
+    # 5 data, 3 nodes (S1, S2, G), 3 arcs: 15 flow rows, 30 ends rows, 15 rejection rows,
+    # less the 3 rows Σ_out χ ≤ 1 at G of the data that G does not consume: nothing leaves G,
+    # so they are the constant 0 ≤ 1 and are not written
+    assert built.model.rows["path"] == 57
 
 
 def test_soft_deadlines_have_no_rejection_rows() -> None:
     built = build([PathBlock()], DeadlineMode.SOFT)
-    assert built.model.rows["path"] == 45
+    # 45 rows less the 5 at G: under soft deadlines the final outputs give 0 ≤ ρ = 0 too
+    assert built.model.rows["path"] == 40
 
 
 def test_routing_variables_are_chi_on_the_arcs_and_nu_on_the_windows() -> None:
