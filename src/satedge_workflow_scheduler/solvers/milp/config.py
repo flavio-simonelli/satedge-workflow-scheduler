@@ -98,6 +98,9 @@ class MilpConfig:
             from level 6 on.
         polish: Whether the LP is re-solved with the binaries fixed, to remove the residuals
             of the big-M that the integrality tolerance leaves.
+        warm_start: Whether the solver starts from the calendar of the priority-EDF/EFT
+            heuristic (rule 9). Only for instances without committed requests: the heuristic
+            does not reserve them.
         solve: Parameters of the solver.
 
     Raises:
@@ -111,6 +114,7 @@ class MilpConfig:
     lazy: frozenset[LazyGroup] = frozenset()
     plmm_formulation: PlmmFormulation = PlmmFormulation.FLOW
     polish: bool = False
+    warm_start: bool = False
     solve: SolveParams = field(default_factory=SolveParams)
 
     def __post_init__(self) -> None:

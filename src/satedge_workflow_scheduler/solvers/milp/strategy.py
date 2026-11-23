@@ -27,7 +27,7 @@ from typing import Any, Protocol
 
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.nodes import NodeId
-from satedge_workflow_scheduler.domain.solution import Solution
+from satedge_workflow_scheduler.domain.solution import Schedule, Solution
 from satedge_workflow_scheduler.scheduling.feasibility import FEASIBILITY_TOLERANCE
 from satedge_workflow_scheduler.scheduling.plmm_occupancy import (
     load_profile,
@@ -44,6 +44,8 @@ from satedge_workflow_scheduler.solvers.milp.blocks.base import BuildContext
 from satedge_workflow_scheduler.solvers.milp.builder import ModelBuilder
 from satedge_workflow_scheduler.solvers.milp.config import LazyGroup, MilpConfig
 from satedge_workflow_scheduler.solvers.milp.decoding import decode
+from satedge_workflow_scheduler.solvers.milp.encoding import encode
+from satedge_workflow_scheduler.solvers.milp.errors import MilpConfigError
 from satedge_workflow_scheduler.solvers.milp.formulation_factory import (
     Restricted,
     blocks_for,
@@ -51,6 +53,9 @@ from satedge_workflow_scheduler.solvers.milp.formulation_factory import (
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
 from satedge_workflow_scheduler.solvers.milp.objective import objective
 from satedge_workflow_scheduler.solvers.milp.polish import polish
+from satedge_workflow_scheduler.solvers.priority_edf_eft.solver import (
+    PriorityEdfEftSolver,
+)
 
 BackendFactory = Callable[[], MilpBackend]
 
@@ -74,6 +79,37 @@ class SolveStrategy(Protocol):
         ...
 
 
+def warm_start_of(
+    instance: ProblemInstance, data: ModelData, config: MilpConfig
+) -> Schedule | None:
+    """The calendar the solve starts from, or ``None`` if it starts from nothing.
+
+    The calendar is the one of the priority-EDF/EFT heuristic, when the configuration asks for it.
+    A heuristic that cannot deliver every request in soft mode gives none.
+
+    Raises:
+        MilpConfigError: If the configuration asks for a warm start on an instance with
+            committed requests or a plan release. The heuristic does not reserve them yet: its
+            ledger must be loaded with the committed calendar and the release of the plan
+            (``priority_edf_eft/ledger.py``), and the heuristic must skip the committed
+            requests. Until then the warm start is refused, not silently dropped.
+    """
+    if not config.warm_start:
+        return None
+    if data.is_online:
+        raise MilpConfigError(
+            "warm start on an instance with committed requests or a plan release is not "
+            "supported yet: the priority-EDF/EFT heuristic does not reserve the committed "
+            "calendar nor the release of the plan. Unblock it in "
+            "solvers/priority_edf_eft (load the ledger with the committed calendar and skip "
+            "the committed requests), then remove this error; until then use warm_start=False"
+        )
+    try:
+        return PriorityEdfEftSolver(config.deadline).solve(instance).schedule
+    except InfeasibleModelError:
+        return None
+
+
 def solve_once(
     instance: ProblemInstance,
     data: ModelData,
@@ -81,9 +117,10 @@ def solve_once(
     backend: BackendFactory,
     restricted: Restricted | None,
     params: SolveParams,
+    start: Schedule | None = None,
 ) -> Solution:
-    """Build the model, with the lazy groups of ``restricted`` on their keys only, solve it once,
-    and decode it.
+    """Build the model, with the lazy groups of ``restricted`` on their keys only, give it the
+    starting calendar ``start`` if there is one, solve it once, and decode it.
 
     Raises:
         InfeasibleModelError: If the solver proves that the model has no solution.
@@ -94,6 +131,8 @@ def solve_once(
     model = ModelBuilder(data, sink).build(blocks)
     context = BuildContext(data, model.variables, model.families)
     sink.set_objective(dict(objective(context).terms))
+    if start is not None:
+        sink.set_start(encode(data, model, start))
 
     result = sink.solve(params)
     if config.polish:
@@ -115,7 +154,8 @@ class DirectSolve:
         config: MilpConfig,
         backend: BackendFactory,
     ) -> Solution:
-        return solve_once(instance, data, config, backend, None, config.solve)
+        start = warm_start_of(instance, data, config)
+        return solve_once(instance, data, config, backend, None, config.solve, start)
 
 
 class LazyConstraint(Protocol):
@@ -180,6 +220,7 @@ class LazySolve:
                 nothing, or if a group is still violated where its constraints are written.
         """
         started = time.monotonic()
+        start = warm_start_of(instance, data, config)
         written: dict[LazyGroup, frozenset[Any]] = {
             c.group: frozenset() for c in self._constraints
         }
@@ -188,7 +229,9 @@ class LazySolve:
             rounds.append(dict(written))
             self.rounds = tuple(rounds)
             params = _remaining(config.solve, started)
-            solution = solve_once(instance, data, config, backend, written, params)
+            solution = solve_once(
+                instance, data, config, backend, written, params, start
+            )
             violated = {
                 c.group: c.violations(instance, solution) for c in self._constraints
             }
