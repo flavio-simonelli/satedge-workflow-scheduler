@@ -46,7 +46,6 @@ from satedge_workflow_scheduler.solvers.milp.builder import ModelBuilder
 from satedge_workflow_scheduler.solvers.milp.config import LazyGroup, MilpConfig
 from satedge_workflow_scheduler.solvers.milp.decoding import decode
 from satedge_workflow_scheduler.solvers.milp.encoding import encode
-from satedge_workflow_scheduler.solvers.milp.errors import MilpConfigError
 from satedge_workflow_scheduler.solvers.milp.formulation_factory import (
     Restricted,
     blocks_for,
@@ -58,9 +57,8 @@ from satedge_workflow_scheduler.solvers.milp.reductions import (
     Reductions,
     reductions_for,
 )
-from satedge_workflow_scheduler.solvers.priority_edf_eft.solver import (
-    PriorityEdfEftSolver,
-)
+from satedge_workflow_scheduler.solvers.sequential.config import SequentialConfig
+from satedge_workflow_scheduler.solvers.sequential.solver import SequentialSolver
 
 BackendFactory = Callable[[], MilpBackend]
 
@@ -89,28 +87,19 @@ def warm_start_of(
 ) -> Schedule | None:
     """The calendar the solve starts from, or ``None`` if it starts from nothing.
 
-    The calendar is the one of the priority-EDF/EFT heuristic, when the configuration asks for it.
-    A heuristic that cannot deliver every request in soft mode gives none.
-
-    Raises:
-        MilpConfigError: If the configuration asks for a warm start on an instance with
-            committed requests or a plan release. The heuristic does not reserve them yet: its
-            ledger must be loaded with the committed calendar and the release of the plan
-            (``priority_edf_eft/ledger.py``), and the heuristic must skip the committed
-            requests. Until then the warm start is refused, not silently dropped.
+    The calendar is the one of the sequential heuristic (priority-EDF, EFT, safe intervals), when
+    the configuration asks for it. The heuristic reserves the committed calendar and the plan
+    release, so the warm start is also given to online instances. A heuristic that cannot deliver
+    every request in soft mode gives none.
     """
     if not config.warm_start:
         return None
-    if data.is_online:
-        raise MilpConfigError(
-            "warm start on an instance with committed requests or a plan release is not "
-            "supported yet: the priority-EDF/EFT heuristic does not reserve the committed "
-            "calendar nor the release of the plan. Unblock it in "
-            "solvers/priority_edf_eft (load the ledger with the committed calendar and skip "
-            "the committed requests), then remove this error; until then use warm_start=False"
-        )
     try:
-        return PriorityEdfEftSolver(config.deadline).solve(instance).schedule
+        return (
+            SequentialSolver(SequentialConfig(deadline=config.deadline))
+            .solve(instance)
+            .schedule
+        )
     except InfeasibleModelError:
         return None
 

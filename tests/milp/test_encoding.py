@@ -16,9 +16,8 @@ from satedge_workflow_scheduler.solvers.milp.decoding import decode
 from satedge_workflow_scheduler.solvers.milp.encoding import encode
 from satedge_workflow_scheduler.solvers.milp.expr import Sense
 from satedge_workflow_scheduler.solvers.milp.formulation_factory import blocks_for
-from satedge_workflow_scheduler.solvers.priority_edf_eft.solver import (
-    PriorityEdfEftSolver,
-)
+from satedge_workflow_scheduler.solvers.sequential.config import SequentialConfig
+from satedge_workflow_scheduler.solvers.sequential.solver import SequentialSolver
 
 TOLERANCE = 1e-6
 
@@ -30,7 +29,7 @@ def _routed_model() -> Built:
 
 def test_the_heuristic_calendar_satisfies_the_routed_model() -> None:
     instance = sample_instance()
-    solution = PriorityEdfEftSolver().solve(instance)
+    solution = SequentialSolver(SequentialConfig()).solve(instance)
     built = _routed_model()
     values = encode(built.ctx.data, built.model, solution.schedule)
 
@@ -51,7 +50,7 @@ def test_the_heuristic_calendar_satisfies_the_routed_model() -> None:
 
 def test_the_encoded_calendar_decodes_back_to_the_same_calendar() -> None:
     instance = sample_instance()
-    solution = PriorityEdfEftSolver().solve(instance)
+    solution = SequentialSolver(SequentialConfig()).solve(instance)
     built = _routed_model()
     values = encode(built.ctx.data, built.model, solution.schedule)
 

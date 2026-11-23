@@ -100,9 +100,8 @@ class MilpConfig:
             from level 6 on.
         polish: Whether the LP is re-solved with the binaries fixed, to remove the residuals
             of the big-M that the integrality tolerance leaves.
-        warm_start: Whether the solver starts from the calendar of the priority-EDF/EFT
-            heuristic (rule 9). Only for instances without committed requests: the heuristic
-            does not reserve them.
+        warm_start: Whether the solver starts from the calendar of the sequential heuristic
+            (rule 9).
         solve: Parameters of the solver.
 
     Raises:

@@ -17,7 +17,6 @@ from satedge_workflow_scheduler.solvers.milp.backends.fake_recording import (
     FakeRecordingBackend,
 )
 from satedge_workflow_scheduler.solvers.milp.config import Level, MilpConfig
-from satedge_workflow_scheduler.solvers.milp.errors import MilpConfigError
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
 from satedge_workflow_scheduler.solvers.milp.solver import MilpSolver
 from satedge_workflow_scheduler.solvers.milp.strategy import warm_start_of
@@ -37,18 +36,14 @@ def test_the_heuristic_calendar_is_the_warm_start_of_an_offline_instance() -> No
     assert len(start.executions) == 3 and len(start.transfers) == 3
 
 
-def test_an_online_instance_refuses_the_warm_start_until_the_heuristic_is_ready() -> (
+def test_an_online_instance_starts_from_a_calendar_that_keeps_the_committed_requests() -> (
     None
 ):
     config = MilpConfig(level=Level.ROUTING, warm_start=True)
     instance = online_instance({"S1": 0.0, "S2": 0.0})
-    data = ModelData(instance, DeadlineMode.HARD)
-    assert data.is_online
-    with pytest.raises(MilpConfigError, match="not supported yet"):
-        warm_start_of(instance, data, config)
-    # without the option the online instance is solved as usual
-    plain = MilpConfig(level=Level.ROUTING)
-    assert warm_start_of(instance, data, plain) is None
+    start = warm_start_of(instance, ModelData(instance, DeadlineMode.HARD), config)
+    assert start is not None
+    assert start.restricted_to(["r2"]) == instance.committed
 
 
 def test_the_solver_receives_the_starting_values_before_it_solves() -> None:
