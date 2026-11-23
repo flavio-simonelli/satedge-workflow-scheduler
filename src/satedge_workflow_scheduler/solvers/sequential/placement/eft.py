@@ -74,7 +74,7 @@ class _Progress:
     """Where the placement of a request has got to.
 
     Attributes:
-        reservations: The reservations, with the tentative ones of the request.
+        reservations: All the reservations, with the tentative ones of the request.
         location: The node the current data item is on.
         held_since: Since when it occupies the PLMM there: its open occupancy.
         ready: From when it can leave or be used.
