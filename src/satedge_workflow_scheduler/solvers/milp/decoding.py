@@ -30,6 +30,7 @@ from satedge_workflow_scheduler.domain.solution import (
 )
 from satedge_workflow_scheduler.scheduling.delivery import delivery_time
 from satedge_workflow_scheduler.scheduling.errors import DeliveryError
+from satedge_workflow_scheduler.scheduling.feasibility import FEASIBILITY_TOLERANCE
 from satedge_workflow_scheduler.scheduling.objective import evaluate
 from satedge_workflow_scheduler.solvers.errors import SolverError
 from satedge_workflow_scheduler.solvers.milp.backends.ports import BackendStatus
@@ -77,6 +78,16 @@ def _value(expr: LinExpr, values: Mapping[Var, float]) -> float:
     return sum(c * values.get(v, 0.0) for v, c in expr.terms.items()) + expr.constant
 
 
+def _instant(value: float) -> float:
+    """An instant of the solution, with the rounding of the solver removed at zero.
+
+    A solver may return a start of ``-1e-13`` where the model says ``t >= 0``: such a value is
+    the rounding of a feasible solution and becomes 0. A clearly negative instant is kept, so
+    that the calendar refuses it.
+    """
+    return max(0.0, value) if value >= -FEASIBILITY_TOLERANCE else value
+
+
 def _schedule(
     data: ModelData, model: BuiltModel, values: Mapping[Var, float]
 ) -> Schedule:
@@ -89,7 +100,7 @@ def _schedule(
             continue
         for s in data.satellites:
             if _value(variables.x(i, s), values) > _BINARY_THRESHOLD:
-                start = values.get(variables.t(i), 0.0)
+                start = _instant(values.get(variables.t(i), 0.0))
                 executions.append(
                     TaskExecution(
                         i.request_id,
@@ -112,7 +123,7 @@ def _schedule(
             if _value(routing.chi(a, e), values) <= _BINARY_THRESHOLD:
                 continue
             source, target = data.endpoints(e)
-            start = values.get(starts.xi(a, e), 0.0)
+            start = _instant(values.get(starts.xi(a, e), 0.0))
             transfers.append(
                 Transfer(
                     a.request_id,
