@@ -67,7 +67,7 @@ class PlmmFormulation(Enum):
     FLOW = "flow"
     """The flow formulation (FCT): the capacity is a flow between the data that occupy it."""
     EVENTS = "events"
-    """The event formulation (OOE): the capacity is checked at each event. Not implemented yet."""
+    """The event formulation (OOE): the capacity is checked at each event."""
 
 
 @dataclass(frozen=True)
