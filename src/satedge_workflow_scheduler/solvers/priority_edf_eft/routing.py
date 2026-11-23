@@ -6,12 +6,12 @@ delivers a data item first, given the reservations already in the ledger.
 
 from __future__ import annotations
 
-import heapq
-import itertools
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from satedge_workflow_scheduler.domain.network import Arc, Network, WindowedAvailability
 from satedge_workflow_scheduler.domain.nodes import NodeId
+from satedge_workflow_scheduler.scheduling.earliest import Reached, earliest_arrivals
 from satedge_workflow_scheduler.solvers.priority_edf_eft.ledger import (
     ArcKey,
     ResourceLedger,
@@ -97,40 +97,47 @@ class EarliestArrivalRouter:
         ``limit`` are discarded. The source itself is included with an empty route.
         """
         ground = self._network.ground_station.id
-        best: dict[NodeId, Route] = {source: Route((), ready)}
-        fixed: set[NodeId] = set()
-        counter = itertools.count()
-        heap: list[tuple[float, int, NodeId]] = [(ready, next(counter), source)]
+        network = self._network
 
-        while heap:
-            _, _, node = heapq.heappop(heap)
-            if node in fixed:
-                continue
-            fixed.add(node)
-            if node == ground:
-                continue
+        def crossing(index: int, at_tail: float) -> tuple[float, float] | None:
+            arc = network.arcs[index]
+            if arc.target == ground and not to_ground:
+                return None
+            start = self.departure(arc, at_tail, size)
+            if start is None:
+                return None
+            arrival = start + arc.transmission_time(size) + arc.latency
+            if arrival > limit + self._eps:
+                return None
+            return start, arrival
 
-            route = best[node]
-            for index in self._network.outgoing[node]:
-                arc = self._network.arcs[index]
-                if arc.target in fixed:
-                    continue
-                if arc.target == ground and not to_ground:
-                    continue
+        reached = earliest_arrivals(
+            network,
+            {source: ready},
+            crossing,
+            relays=lambda node: node != ground,
+            tolerance=self._eps,
+        )
+        return {node: self._route(reached, node, size) for node in reached}
 
-                start = self.departure(arc, route.arrival, size)
-                if start is None:
-                    continue
-                tx = arc.transmission_time(size)
-                arrival = start + tx + arc.latency
-                if arrival > limit + self._eps:
-                    continue
-
-                current = best.get(arc.target)
-                if current is not None and current.arrival <= arrival + self._eps:
-                    continue
-                hop = Hop(arc.source, arc.target, start, start + tx, arrival)
-                best[arc.target] = Route((*route.hops, hop), arrival)
-                heapq.heappush(heap, (arrival, next(counter), arc.target))
-
-        return {node: best[node] for node in fixed}
+    def _route(
+        self, reached: Mapping[NodeId, Reached], node: NodeId, size: float
+    ) -> Route:
+        """The route that reaches ``node``, with the hops from the source to it."""
+        hops: list[Hop] = []
+        current = reached[node]
+        while current.previous is not None and current.arc is not None:
+            arc = self._network.arcs[current.arc]
+            start = current.departure
+            assert start is not None
+            hops.append(
+                Hop(
+                    arc.source,
+                    arc.target,
+                    start,
+                    start + arc.transmission_time(size),
+                    current.arrival,
+                )
+            )
+            current = reached[current.previous]
+        return Route(tuple(reversed(hops)), reached[node].arrival)
