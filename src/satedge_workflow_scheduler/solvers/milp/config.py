@@ -114,7 +114,7 @@ class MilpConfig:
     strengthening: Strengthening = field(default_factory=Strengthening)
     lazy: frozenset[LazyGroup] = frozenset()
     plmm_formulation: PlmmFormulation = PlmmFormulation.FLOW
-    polish: bool = False
+    polish: bool = True
     warm_start: bool = False
     solve: SolveParams = field(default_factory=SolveParams)
 

@@ -41,7 +41,7 @@ def test_default_configuration_is_the_plain_hard_model() -> None:
     assert config.deadline is DeadlineMode.HARD
     assert config.reductions is True
     assert config.lazy == frozenset()
-    assert config.polish is False
+    assert config.polish is True
     assert config.strengthening == Strengthening()
 
 
