@@ -44,7 +44,9 @@ class Reservations:
     ) -> None:
         self._hpc: Mapping[NodeId, BusyTimeline] = dict(hpc or {})
         self._arcs: Mapping[ArcId, BusyTimeline] = dict(arcs or {})
-        self._plmm: Mapping[NodeId, tuple[PlmmOccupancyInterval, ...]] = dict(plmm or {})
+        self._plmm: Mapping[NodeId, tuple[PlmmOccupancyInterval, ...]] = dict(
+            plmm or {}
+        )
 
     # --- reading ---------------------------------------------------------------------
 
@@ -105,7 +107,9 @@ class Reservations:
             plmm[satellite] = (*plmm.get(satellite, ()), item)
         return Reservations(self._hpc, self._arcs, plmm)
 
-    def with_schedule(self, instance: ProblemInstance, schedule: Schedule) -> Reservations:
+    def with_schedule(
+        self, instance: ProblemInstance, schedule: Schedule
+    ) -> Reservations:
         """Also reserve everything ``schedule`` uses: HPCs, arcs and PLMMs.
 
         The PLMM occupancies are the ones the model gives to the schedule
