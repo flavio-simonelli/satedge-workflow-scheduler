@@ -21,19 +21,23 @@ from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode, deliver
 
 
 def unrealizable_reason(
-    request: Request, instance: ProblemInstance, limit: float
+    request: Request,
+    instance: ProblemInstance,
+    limit: float,
+    eps: float = TIME_TOLERANCE,
 ) -> str | None:
     """Why ``request`` can never be delivered by ``limit``, or ``None`` if it may be.
 
     The reason names the first task that can run on no satellite, and says whether it is
-    longer than every computing window or only cannot be placed in time.
+    longer than every computing window or only cannot be placed in time. ``eps`` is the
+    tolerance of the bounds (:func:`request_bounds`) and of the comparison with the windows.
     """
-    bounds = request_bounds(instance, request, limit)
+    bounds = request_bounds(instance, request, limit, eps)
     for task_index in range(len(request.tasks)):
         if bounds.executable_satellites(task_index):
             continue
         fits_somewhere = any(
-            w.duration >= request.hpc_duration(task_index, s) - TIME_TOLERANCE
+            w.duration >= request.hpc_duration(task_index, s) - eps
             for s in instance.network.satellites
             for w in s.hpc_windows
         )

@@ -72,7 +72,7 @@ class RequestBounds:
         la: tuple[NodeTimes, ...],
         es: tuple[NodeTimes, ...],
         lc: tuple[NodeTimes, ...],
-        compatible: tuple[Mapping[NodeId, tuple[TimeWindow, ...]], ...],
+        compatible: tuple[Mapping[NodeId, Mapping[int, TimeWindow]], ...],
     ) -> None:
         self.request_id = request_id
         """Identifier of the request."""
@@ -108,6 +108,13 @@ class RequestBounds:
         A window ``[t_w, T_w]`` is compatible if ``[max(ES, t_w), min(LC, T_w)]`` lasts at
         least ``L̄_{i,s}``: the task can run in it and still let the request be delivered.
         """
+        return tuple(self._compatible[task_index][satellite].values())
+
+    def compatible_indices(
+        self, task_index: int, satellite: NodeId
+    ) -> Mapping[int, TimeWindow]:
+        """The compatible windows of :meth:`compatible_windows`, by their index among the
+        computing windows of ``satellite``."""
         return self._compatible[task_index][satellite]
 
     def can_run(self, task_index: int, satellite: NodeId) -> bool:
@@ -205,26 +212,26 @@ def _task_bounds(
 ) -> tuple[
     tuple[NodeTimes, ...],
     tuple[NodeTimes, ...],
-    tuple[Mapping[NodeId, tuple[TimeWindow, ...]], ...],
+    tuple[Mapping[NodeId, Mapping[int, TimeWindow]], ...],
 ]:
     """``ES``, ``LC`` and the compatible windows of every task on every satellite."""
     es_all: list[NodeTimes] = []
     lc_all: list[NodeTimes] = []
-    compatible_all: list[Mapping[NodeId, tuple[TimeWindow, ...]]] = []
+    compatible_all: list[Mapping[NodeId, Mapping[int, TimeWindow]]] = []
     for k, task_durations in enumerate(durations):
         es: dict[NodeId, float] = {}
         lc: dict[NodeId, float] = {}
-        compatible: dict[NodeId, tuple[TimeWindow, ...]] = {}
+        compatible: dict[NodeId, Mapping[int, TimeWindow]] = {}
         for s in instance.network.satellites:
             d = task_durations[s.id]
             ready = max(ea[k][s.id], instance.release_of(s.id))
             es[s.id] = _ef(s.hpc_windows, ready, d, eps) - d
             lc[s.id] = _ls(s.hpc_windows, la[k + 1][s.id], d, eps) + d
-            compatible[s.id] = tuple(
-                w
-                for w in s.hpc_windows
+            compatible[s.id] = {
+                index: w
+                for index, w in enumerate(s.hpc_windows)
                 if min(lc[s.id], w.end) - max(es[s.id], w.start) >= d - eps
-            )
+            }
         es_all.append(es)
         lc_all.append(lc)
         compatible_all.append(compatible)

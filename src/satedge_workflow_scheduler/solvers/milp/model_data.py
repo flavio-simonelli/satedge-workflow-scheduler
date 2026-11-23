@@ -459,6 +459,11 @@ class ModelData:
         The bounds of the section "Limiti temporali a priori" of the document, for the time limit
         ``τ̂_r`` of the deadline mode. Each request is computed once, when first asked.
 
+        The instants are compared with the tolerance of the checker, not with the tighter one
+        of the heuristic: an activity that overflows its window by less than the checker
+        accepts still fits, so the reductions that read the bounds never remove a calendar the
+        checker accepts because of a single comparison.
+
         Raises:
             ModelBuildError: If the request is committed: its bounds are the values of its
                 calendar, not those of a relaxation.
@@ -469,15 +474,22 @@ class ModelData:
             )
         if request_id not in self._bounds:
             self._bounds[request_id] = request_bounds(
-                self._instance, self._request(request_id), self.limit(request_id)
+                self._instance,
+                self._request(request_id),
+                self.limit(request_id),
+                eps=_TOLERANCE,
             )
         return self._bounds[request_id]
 
     def unrealizable_reason(self, request_id: str) -> str | None:
         """Why the new request can never be delivered by its time limit, or ``None`` if it may
-        be (section "Richieste impossibili" of the document)."""
+        be (section "Richieste impossibili" of the document), with the tolerance of
+        :meth:`bounds`."""
         return unrealizable_reason(
-            self._request(request_id), self._instance, self.limit(request_id)
+            self._request(request_id),
+            self._instance,
+            self.limit(request_id),
+            eps=_TOLERANCE,
         )
 
     @property

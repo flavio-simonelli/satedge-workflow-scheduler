@@ -145,3 +145,10 @@ def test_a_window_too_late_for_the_delivery_is_not_compatible() -> None:
     b = _bounds(s1_windows=(TimeWindow(0.0, 50.0), TimeWindow(140.0, 160.0)))
     assert b.latest_completion(0, "S1") == 50.0
     assert b.compatible_windows(0, "S1") == (TimeWindow(0.0, 50.0),)
+    assert b.compatible_indices(0, "S1") == {0: TimeWindow(0.0, 50.0)}
+
+
+def test_the_indices_of_the_compatible_windows_follow_the_satellite() -> None:
+    # a first window too short for the 13 s task: the compatible one is the second
+    b = _bounds(s1_windows=(TimeWindow(0.0, 5.0), TimeWindow(10.0, 50.0)))
+    assert b.compatible_indices(0, "S1") == {1: TimeWindow(10.0, 50.0)}

@@ -326,6 +326,15 @@ def test_a_request_that_can_never_be_served_is_rejected_a_priori() -> None:
     assert model.variables.windows(TaskKey("r2", 0), "S2") == ()
 
 
+def test_a_window_short_by_less_than_the_checker_tolerance_is_kept() -> None:
+    # the task of r2 lasts 1 + 97 + 2 s and 5e-7 more: it overflows [0, 100] by less than the
+    # checker accepts, so a calendar that runs it there is feasible and must stay in the model
+    data = ModelData(_instance(r2_execution=97.0 + 5e-7), HARD)
+    reductions = Reductions.exact(data)
+    assert reductions.excluded == frozenset()
+    assert reductions.task_windows(TaskKey("r2", 0), "S2") == (0,)
+
+
 def test_under_soft_deadlines_it_makes_the_instance_infeasible() -> None:
     data = ModelData(_impossible(), SOFT)
     with pytest.raises(InfeasibleModelError) as error:

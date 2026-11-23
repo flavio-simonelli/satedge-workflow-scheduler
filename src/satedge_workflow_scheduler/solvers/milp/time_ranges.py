@@ -6,8 +6,9 @@ interval that contains it in every feasible solution in which the request is acc
 (proposition "limiti" of the document):
 
 - the task ``i`` in the window ``w`` of ``s`` runs in
-  ``I^task_{i,s,w} = [max(ES_{i,s}, t_w), min(LC_{i,s}, T_w)]``, and the window is *compatible*
-  with ``i`` if the interval lasts at least ``L̄_{i,s}``;
+  ``I^task_{i,s,w} = [max(ES_{i,s}, t_w), min(LC_{i,s}, T_w)]``, on the windows *compatible*
+  with ``i``, those in which the interval lasts at least ``L̄_{i,s}``. The bounds give them
+  (:meth:`RequestBounds.compatible_indices`);
 - the data ``a`` on the arc ``e = (u, v)`` is transmitted, from the start to the arrival of the
   last bit, in ``I^link_{a,e} = [max(EA_{a,u}, b^plan_u), LA_{a,v}]``. A visibility window is
   compatible with ``a`` if it shares at least ``D_{a,e} + λ_e`` with the interval, and an arc
@@ -29,8 +30,9 @@ origin: these are the only ways in which the presence ``q_{a,v}`` can be 1. That
 condition ``EA_{a,v} ≤ LA_{a,v}`` of the document, and it keeps every stay that the variables of
 the model allow, whatever the rounding of the bounds.
 
-The comparisons use the tolerance of the checker, in the direction that keeps more: a calendar
-that the checker accepts never lies outside its intervals.
+The comparisons use the tolerance of the checker, in the direction that keeps more, and so do the
+bounds they start from (:meth:`ModelData.bounds`): an activity that overflows its window, or
+starts before its data is there, by less than the checker accepts is never removed for that.
 """
 
 from __future__ import annotations
@@ -137,11 +139,9 @@ def _new_ranges(data: ModelData, request_id: str) -> RequestRanges:
                 bounds.earliest_start(i.task_index, s),
                 bounds.latest_completion(i.task_index, s),
             )
-            needed = data.duration(i, s) - _TOLERANCE
             tasks[i][s] = {
-                w: span
-                for w, window in enumerate(data.hpc_windows(s))
-                if (span := allowed.meet(Span.of(window))).length >= needed
+                w: allowed.meet(Span.of(window))
+                for w, window in bounds.compatible_indices(i.task_index, s).items()
             }
 
     links: dict[tuple[DataKey, ArcId], Span] = {}
