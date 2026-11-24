@@ -16,13 +16,17 @@ from satedge_workflow_scheduler.domain.network import (
 )
 from satedge_workflow_scheduler.domain.nodes import GroundStation, Satellite
 from satedge_workflow_scheduler.domain.requests import Request, Task
+from satedge_workflow_scheduler.domain.solution import Schedule, TaskExecution, Transfer
 from satedge_workflow_scheduler.io.documents import (
+    ContactPlanDoc,
+    ExecutionDoc,
     InstanceDoc,
     LinkDoc,
     PlaneDoc,
     RequestDoc,
     SatelliteDoc,
     SolverDoc,
+    TransferDoc,
     WindowDoc,
 )
 from satedge_workflow_scheduler.io.errors import DocumentError
@@ -198,5 +202,66 @@ def solver_config_from_document(doc: SolverDoc) -> MilpConfig | SequentialConfig
             threads=doc.limits.threads,
             memory_limit_gb=doc.limits.memory_limit_gb,
             verbose=doc.verbose,
+        ),
+    )
+
+
+def apply_contact_plan(doc: InstanceDoc, plan: ContactPlanDoc) -> InstanceDoc:
+    """The instance document with the windows of ``plan`` on its links.
+
+    A link that the plan names becomes windowed. The plan may only name links of the topology,
+    each once, and only links that the instance does not window already.
+
+    Raises:
+        DocumentError: If the plan names a missing link, names a link twice, or a link that is
+            windowed in the instance already.
+    """
+    links = list(doc.topology.links)
+    position = {frozenset((link.a, link.b)): i for i, link in enumerate(links)}
+    named: set[frozenset[str]] = set()
+    for entry in plan.links:
+        key = frozenset((entry.a, entry.b))
+        label = f"{entry.a}-{entry.b}"
+        if key not in position:
+            raise DocumentError(f"contact plan: the topology has no link {label}")
+        if key in named:
+            raise DocumentError(f"contact plan: link {label} is listed twice")
+        index = position[key]
+        if links[index].windows is not None:
+            raise DocumentError(
+                f"link {label} is windowed in the instance: remove its windows or its "
+                "contact plan entry"
+            )
+        links[index] = links[index].model_copy(update={"windows": entry.windows})
+        named.add(key)
+    topology = doc.topology.model_copy(update={"links": links})
+    return doc.model_copy(update={"topology": topology})
+
+
+def schedule_from_documents(
+    executions: list[ExecutionDoc], transfers: list[TransferDoc]
+) -> Schedule:
+    """The calendar described by execution and transfer documents."""
+    return Schedule(
+        executions=tuple(
+            TaskExecution(
+                request_id=e.request,
+                task_index=e.task,
+                satellite=e.satellite,
+                start=e.start_s,
+                end=e.end_s,
+            )
+            for e in executions
+        ),
+        transfers=tuple(
+            Transfer(
+                request_id=t.request,
+                data_index=t.data,
+                source=t.source,
+                target=t.target,
+                start=t.start_s,
+                end=t.end_s,
+            )
+            for t in transfers
         ),
     )

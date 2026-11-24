@@ -11,11 +11,8 @@ from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.solution import (
     ObjectiveValue,
     RequestOutcome,
-    Schedule,
     Solution,
     SolveStatus,
-    TaskExecution,
-    Transfer,
 )
 from satedge_workflow_scheduler.io.documents import (
     ArcResultDoc,
@@ -30,6 +27,7 @@ from satedge_workflow_scheduler.io.documents import (
     ViolationDoc,
 )
 from satedge_workflow_scheduler.io.errors import DocumentError
+from satedge_workflow_scheduler.io.translate import schedule_from_documents
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
 from satedge_workflow_scheduler.solvers.run import SolverRun
 
@@ -149,29 +147,7 @@ def read_result(path: str | Path) -> Solution:
 
 def solution_from_document(document: ResultDoc) -> Solution:
     """The solution described by a result document."""
-    schedule = Schedule(
-        executions=tuple(
-            TaskExecution(
-                request_id=e.request,
-                task_index=e.task,
-                satellite=e.satellite,
-                start=e.start_s,
-                end=e.end_s,
-            )
-            for e in document.executions
-        ),
-        transfers=tuple(
-            Transfer(
-                request_id=t.request,
-                data_index=t.data,
-                source=t.source,
-                target=t.target,
-                start=t.start_s,
-                end=t.end_s,
-            )
-            for t in document.transfers
-        ),
-    )
+    schedule = schedule_from_documents(document.executions, document.transfers)
     outcomes = tuple(
         RequestOutcome(
             r.id,
