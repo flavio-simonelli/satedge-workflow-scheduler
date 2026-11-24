@@ -107,8 +107,9 @@ def test_time_limit_and_threads_reach_the_solver() -> None:
 def test_a_row_on_an_unknown_variable_is_a_model_error() -> None:
     backend = _backend()
     backend.add_var(0.0, 1.0, VarKind.BINARY)
+    bad = (LinExpr.var(4) <= 1).named("bad")
     with pytest.raises(ModelBuildError, match="unknown variable 4"):
-        backend.add_rows([(LinExpr.var(4) <= 1).named("bad")])
+        backend.add_rows([bad])
 
 
 def test_write_produces_a_readable_lp_file(tmp_path: Path) -> None:
@@ -136,8 +137,9 @@ def test_a_nan_coefficient_or_rhs_is_a_model_error() -> None:
     x = backend.add_var(0.0, 1.0, VarKind.CONTINUOUS)
     not_a_number = float("nan")
     bad_rhs = LinExpr.var(x) + 0.0
+    bad_rhs_row = Row(dict(bad_rhs.terms), Sense.LE, not_a_number, "bad_rhs")
     with pytest.raises(ModelBuildError, match="NaN"):
-        backend.add_rows([Row(dict(bad_rhs.terms), Sense.LE, not_a_number, "bad_rhs")])
+        backend.add_rows([bad_rhs_row])
     bad_coef = Row({x: not_a_number}, Sense.LE, 1.0, "bad_coef")
     with pytest.raises(ModelBuildError, match="NaN"):
         backend.add_rows([bad_coef])

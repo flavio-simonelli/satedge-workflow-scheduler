@@ -31,7 +31,8 @@ def test_the_heuristic_calendar_is_the_warm_start_of_an_offline_instance() -> No
     instance = sample_instance()
     start = warm_start_of(instance, config)
     assert start is not None
-    assert len(start.executions) == 3 and len(start.transfers) == 3
+    assert len(start.executions) == 3
+    assert len(start.transfers) == 3
 
 
 def test_an_online_instance_starts_from_a_calendar_that_keeps_the_committed_requests() -> (
@@ -55,8 +56,9 @@ def test_the_solver_receives_the_starting_values_before_it_solves() -> None:
     config = MilpConfig(level=Level.ROUTING, warm_start=True)
     # the fake backend has no scripted result: the solve reports no solution, and the solver
     # raises, but only after it has received the starting values
+    solver = MilpSolver(config, factory)
     with pytest.raises(SolverError):
-        MilpSolver(config, factory).solve(sample_instance())
+        solver.solve(sample_instance())
     (backend,) = backends
     assert backend.starts
     assert set(backend.starts.values()) >= {0.0, 1.0}
@@ -73,6 +75,7 @@ def test_the_optimum_is_the_same_with_and_without_the_warm_start() -> None:
     warm = MilpSolver(warm_config, GurobiBackend).solve(sample_instance())
     assert warm.status is SolveStatus.OPTIMAL
     assert check(sample_instance(), warm, DeadlineMode.HARD) == ()
-    assert cold.objective is not None and warm.objective is not None
+    assert cold.objective is not None
+    assert warm.objective is not None
     assert warm.objective.primary == pytest.approx(cold.objective.primary)
     assert warm.objective.response == pytest.approx(cold.objective.response)

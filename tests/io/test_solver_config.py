@@ -61,30 +61,33 @@ def test_the_sequential_file_gives_the_heuristic_configuration(tmp_path: Path) -
 
 def test_a_level_that_does_not_exist_is_a_document_error(tmp_path: Path) -> None:
     text = MILP.replace("level: 6", "level: 2")
+    level_file = _write(tmp_path, text)
     with pytest.raises(DocumentError, match="milp.level"):
-        load_solver_config(_write(tmp_path, text))
+        load_solver_config(level_file)
 
 
 def test_the_milp_method_needs_its_section(tmp_path: Path) -> None:
     text = 'schema_version: "1.0.0"\nmethod: milp\n'
+    section_file = _write(tmp_path, text)
     with pytest.raises(DocumentError, match="needs a 'milp' section"):
-        load_solver_config(_write(tmp_path, text))
+        load_solver_config(section_file)
 
 
 def test_an_unknown_lazy_group_is_rejected(tmp_path: Path) -> None:
     text = MILP.replace("lazy: [plmm]", "lazy: [colour]")
+    colour_file = _write(tmp_path, text)
     with pytest.raises(DocumentError, match="colour"):
-        load_solver_config(_write(tmp_path, text))
+        load_solver_config(colour_file)
 
 
 def test_an_unknown_method_is_rejected_with_its_field(tmp_path: Path) -> None:
+    method_file = _write(tmp_path, 'schema_version: "1.0.0"\nmethod: genetic\n')
     with pytest.raises(DocumentError, match=r"method"):
-        load_solver_config(
-            _write(tmp_path, 'schema_version: "1.0.0"\nmethod: genetic\n')
-        )
+        load_solver_config(method_file)
 
 
 def test_limits_are_rejected_for_the_sequential_heuristic(tmp_path: Path) -> None:
     text = 'schema_version: "1.0.0"\nmethod: sequential\nlimits: {time_limit_s: 10}\n'
+    limits_file = _write(tmp_path, text)
     with pytest.raises(DocumentError, match="limits apply to method 'milp' only"):
-        load_solver_config(_write(tmp_path, text))
+        load_solver_config(limits_file)

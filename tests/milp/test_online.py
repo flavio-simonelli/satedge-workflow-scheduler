@@ -85,7 +85,8 @@ def test_a_new_task_starts_after_the_release_of_the_plan() -> None:
 def test_a_satellite_the_plan_never_reaches_is_not_used_by_new_requests() -> None:
     built = _built(release_s1=math.inf)
     row = built.row(f"unreached-task[{TaskKey('r1', 0)},S1]")
-    assert row.sense is Sense.EQ and row.rhs == pytest.approx(0.0)
+    assert row.sense is Sense.EQ
+    assert row.rhs == pytest.approx(0.0)
     # no new data leaves S1: arc 0 is S1 → S2
     assert built.row(f"unreached-arc[{DataKey('r1', 0)},0]").rhs == pytest.approx(0.0)
 
@@ -93,9 +94,10 @@ def test_a_satellite_the_plan_never_reaches_is_not_used_by_new_requests() -> Non
 def test_the_solver_adds_the_online_blocks_when_the_instance_is_online() -> None:
     instance = online_instance({"S1": 20.0, "S2": 0.0})
     backend = FakeRecordingBackend()
+    solver = MilpSolver(MilpConfig(level=Level.ROUTING), lambda: backend)
     with pytest.raises(SolverError):
         # the fake backend does not solve: what matters are the rows it received
-        MilpSolver(MilpConfig(level=Level.ROUTING), lambda: backend).solve(instance)
+        solver.solve(instance)
     names = {row.name.split("[")[0] for row in backend.rows}
     assert {"committed-t", "committed-xi", "release-task"} <= names
 

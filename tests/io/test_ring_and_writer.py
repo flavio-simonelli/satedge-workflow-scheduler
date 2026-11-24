@@ -95,8 +95,9 @@ def test_the_ring_windows_come_from_the_contact_plan(tmp_path: Path) -> None:
 def test_a_windowed_ring_link_without_contact_windows_is_rejected(
     tmp_path: Path,
 ) -> None:
+    ring = _ring(tmp_path)
     with pytest.raises(DocumentError, match="its windows come from the contact plan"):
-        load(_ring(tmp_path))
+        load(ring)
 
 
 def test_the_hpc_windows_repeat_with_the_period_and_the_startup_is_taken_off(
@@ -119,11 +120,10 @@ def test_the_plmm_override_applies_to_its_satellite_only(tmp_path: Path) -> None
 
 def test_an_override_for_a_missing_satellite_is_rejected(tmp_path: Path) -> None:
     text = RING.replace("{COM1: 15}", "{COM9: 15}")
+    ring_file = _write(tmp_path, "ring.yaml", text)
+    contact_file = _write(tmp_path, "c.yaml", CONTACT)
     with pytest.raises(DocumentError, match="COM9 is not a satellite"):
-        load(
-            _write(tmp_path, "ring.yaml", text),
-            contact_plan=_write(tmp_path, "c.yaml", CONTACT),
-        )
+        load(ring_file, contact_plan=contact_file)
 
 
 def test_an_instance_written_and_read_back_is_the_same(tmp_path: Path) -> None:

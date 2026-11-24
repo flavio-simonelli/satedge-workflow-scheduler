@@ -129,7 +129,8 @@ def test_the_lazy_loop_adds_s1_and_reaches_the_eager_optimum() -> None:
     )
     assert check(instance, solution, DeadlineMode.HARD) == ()
     assert check(instance, eager, DeadlineMode.HARD) == ()
-    assert eager.objective is not None and solution.objective is not None
+    assert eager.objective is not None
+    assert solution.objective is not None
     assert solution.objective.response == pytest.approx(eager.objective.response)
     # the full memory of S1 delays r1: delivered at 52.5 instead of 46.5
     by_id = {o.request_id: o for o in solution.outcomes}
@@ -158,7 +159,8 @@ def test_the_lazy_loop_has_a_time_limit_for_all_its_rounds() -> None:
         lazy=frozenset({LazyGroup.PLMM}),
         solve=SolveParams(time_limit=1e-9),
     )
+    lazy_solve = LazySolve([LazyPlmm()])
+    model_data = ModelData(instance, DeadlineMode.HARD)
+    backend = _gurobi()
     with pytest.raises(SolverError, match="time limit"):
-        LazySolve([LazyPlmm()]).solve(
-            instance, ModelData(instance, DeadlineMode.HARD), config, _gurobi()
-        )
+        lazy_solve.solve(instance, model_data, config, backend)

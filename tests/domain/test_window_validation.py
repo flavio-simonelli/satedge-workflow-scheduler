@@ -27,8 +27,10 @@ def _link(windows: tuple[TimeWindow, ...], reverse: tuple[TimeWindow, ...]) -> N
 
 
 def test_the_two_directions_of_a_link_must_have_the_same_windows() -> None:
+    forward = (TimeWindow(0.0, 10.0),)
+    reverse = (TimeWindow(0.0, 12.0),)
     with pytest.raises(InstanceError, match="same availability"):
-        _link((TimeWindow(0.0, 10.0),), (TimeWindow(0.0, 12.0),))
+        _link(forward, reverse)
 
 
 def test_a_link_with_the_same_windows_in_both_directions_is_accepted() -> None:

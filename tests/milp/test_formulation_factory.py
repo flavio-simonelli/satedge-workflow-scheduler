@@ -100,8 +100,10 @@ def test_the_plmm_formulation_is_chosen_in_the_config() -> None:
     events = block_names(
         MilpConfig(level=Level.PLMM_CAPACITY, plmm_formulation=PlmmFormulation.EVENTS)
     )
-    assert "plmm_flow" in flow and "plmm_events" not in flow
-    assert "plmm_events" in events and "plmm_flow" not in events
+    assert "plmm_flow" in flow
+    assert "plmm_events" not in flow
+    assert "plmm_events" in events
+    assert "plmm_flow" not in events
 
 
 def test_the_online_state_adds_its_blocks_at_any_level() -> None:

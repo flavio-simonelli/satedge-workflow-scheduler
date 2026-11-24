@@ -96,24 +96,28 @@ def test_a_name_in_the_file_is_kept(tmp_path: Path) -> None:
 
 def test_the_error_names_the_field_that_is_wrong(tmp_path: Path) -> None:
     broken = TINY.replace("execution_s: 10", "execution_s: soon")
+    broken_file = _write(tmp_path, broken)
     with pytest.raises(DocumentError, match=r"requests\[0\]\.tasks\[0\]\.execution_s"):
-        load_instance(_write(tmp_path, broken))
+        load_instance(broken_file)
 
 
 def test_an_unknown_key_is_rejected(tmp_path: Path) -> None:
+    extra_file = _write(tmp_path, TINY + "colour: red\n")
     with pytest.raises(DocumentError, match="(?i)extra"):
-        load_instance(_write(tmp_path, TINY + "colour: red\n"))
+        load_instance(extra_file)
 
 
 def test_a_newer_major_version_is_rejected(tmp_path: Path) -> None:
+    newer_file = _write(tmp_path, TINY.replace('"1.0.0"', '"2.0.0"'))
     with pytest.raises(DocumentError, match="unsupported schema version"):
-        load_instance(_write(tmp_path, TINY.replace('"1.0.0"', '"2.0.0"')))
+        load_instance(newer_file)
 
 
 def test_without_requests_the_horizon_is_required(tmp_path: Path) -> None:
     text = TINY.replace("horizon_s: 600\n", "").split("requests:")[0]
+    text_file = _write(tmp_path, text)
     with pytest.raises(DocumentError, match="horizon_s is required"):
-        load_instance(_write(tmp_path, text))
+        load_instance(text_file)
 
 
 def test_a_missing_file_is_a_document_error(tmp_path: Path) -> None:

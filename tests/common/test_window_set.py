@@ -20,16 +20,19 @@ def test_constructor_accepts_sorted_disjoint_windows() -> None:
 
 
 def test_constructor_rejects_unsorted_windows() -> None:
+    unsorted = [TimeWindow(10.0, 12.0), TimeWindow(0.0, 5.0)]
     with pytest.raises(ValueError):
-        WindowSet([TimeWindow(10.0, 12.0), TimeWindow(0.0, 5.0)])
+        WindowSet(unsorted)
 
 
 def test_constructor_rejects_overlapping_or_touching_windows() -> None:
     # windows of availability come from the instance: they are never fused
+    overlapping = [TimeWindow(0.0, 6.0), TimeWindow(5.0, 9.0)]
+    touching = [TimeWindow(0.0, 5.0), TimeWindow(5.0, 9.0)]
     with pytest.raises(ValueError):
-        WindowSet([TimeWindow(0.0, 6.0), TimeWindow(5.0, 9.0)])
+        WindowSet(overlapping)
     with pytest.raises(ValueError):
-        WindowSet([TimeWindow(0.0, 5.0), TimeWindow(5.0, 9.0)])
+        WindowSet(touching)
 
 
 def test_window_sets_with_the_same_windows_are_equal_and_hash_alike() -> None:

@@ -79,11 +79,10 @@ def test_the_contact_plan_makes_the_named_link_windowed(tmp_path: Path) -> None:
 
 def test_a_contact_plan_for_a_missing_link_is_rejected(tmp_path: Path) -> None:
     plan = PLAN.replace("a: G", "a: S1").replace("b: S2", "b: G")
+    instance_file = _write(tmp_path, "instance.yaml", OPEN)
+    contact_file = _write(tmp_path, "contact.yaml", plan)
     with pytest.raises(DocumentError, match="no link S1-G"):
-        load_instance(
-            _write(tmp_path, "instance.yaml", OPEN),
-            contact_plan=_write(tmp_path, "contact.yaml", plan),
-        )
+        load_instance(instance_file, contact_plan=contact_file)
 
 
 def test_a_link_windowed_in_both_files_is_rejected(tmp_path: Path) -> None:
@@ -91,11 +90,10 @@ def test_a_link_windowed_in_both_files_is_rejected(tmp_path: Path) -> None:
         "- {a: S2, b: G, capacity_gbps: 2, latency_s: 1}",
         "- {a: S2, b: G, capacity_gbps: 2, latency_s: 1, windows: [{start_s: 0, end_s: 5}]}",
     )
+    instance_file = _write(tmp_path, "instance.yaml", windowed)
+    contact_file = _write(tmp_path, "contact.yaml", PLAN)
     with pytest.raises(DocumentError, match="windowed in the instance"):
-        load_instance(
-            _write(tmp_path, "instance.yaml", windowed),
-            contact_plan=_write(tmp_path, "contact.yaml", PLAN),
-        )
+        load_instance(instance_file, contact_plan=contact_file)
 
 
 def test_the_online_state_gives_plan_release_and_inline_committed_calendar(
@@ -117,7 +115,8 @@ committed:
     assert instance.plan_release["S2"] == pytest.approx(50.5)
     assert math.isinf(instance.plan_release["S1"])
     assert instance.committed.request_ids == frozenset({"r1"})
-    assert instance.is_committed("r1") and not instance.is_committed("r2")
+    assert instance.is_committed("r1")
+    assert not instance.is_committed("r2")
 
 
 def test_the_committed_calendar_comes_from_a_saved_result_and_its_filter(
@@ -159,5 +158,6 @@ committed:
     - {request: r1, task: 0, satellite: S1, start_s: 0, end_s: 10}
 """,
     )
+    instance_file = _write(tmp_path, "instance.yaml", OPEN)
     with pytest.raises(DocumentError, match="either 'result' or inline"):
-        load_instance(_write(tmp_path, "instance.yaml", OPEN), online=online)
+        load_instance(instance_file, online=online)

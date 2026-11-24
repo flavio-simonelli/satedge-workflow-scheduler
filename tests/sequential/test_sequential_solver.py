@@ -63,8 +63,9 @@ def test_soft_mode_is_infeasible_when_a_request_cannot_be_delivered_by_the_horiz
     None
 ):
     instance = replace(sample_instance(), horizon=5.0)
+    solver = SequentialSolver(SequentialConfig(deadline=DeadlineMode.SOFT))
     with pytest.raises(InfeasibleModelError) as error:
-        SequentialSolver(SequentialConfig(deadline=DeadlineMode.SOFT)).solve(instance)
+        solver.solve(instance)
     assert set(error.value.reasons) == {"r1", "r2"} or set(error.value.reasons) <= {
         "r1",
         "r2",
@@ -102,5 +103,6 @@ def test_a_committed_request_without_delivery_is_a_fault_of_the_calendar() -> No
         base,
         committed=Schedule(executions=(TaskExecution("r2", 0, "S2", 0.0, 8.0),)),
     )
+    solver = SequentialSolver(SequentialConfig())
     with pytest.raises(CommittedCalendarError):
-        SequentialSolver(SequentialConfig()).solve(broken)
+        solver.solve(broken)

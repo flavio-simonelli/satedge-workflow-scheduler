@@ -78,6 +78,7 @@ def test_the_two_plmm_formulations_give_the_same_optimum() -> None:
         assert check(sample_instance(), solution, DeadlineMode.HARD) == ()
         results[formulation] = solution.objective
     flow, events = results[PlmmFormulation.FLOW], results[PlmmFormulation.EVENTS]
-    assert flow is not None and events is not None
+    assert flow is not None
+    assert events is not None
     assert events.primary == pytest.approx(flow.primary)
     assert events.response == pytest.approx(flow.response)

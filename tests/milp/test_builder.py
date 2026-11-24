@@ -71,8 +71,10 @@ def test_the_decision_variables_are_created_before_the_rows() -> None:
 def test_a_required_family_nobody_provides_is_an_error_before_any_row() -> None:
     backend = FakeRecordingBackend()
     block = _block("needy", requires=frozenset({"ghost"}))
+    builder = ModelBuilder(_data(), backend)
+    blocks = [AssignmentBlock(), block]
     with pytest.raises(ModelBuildError, match="ghost"):
-        ModelBuilder(_data(), backend).build([AssignmentBlock(), block])
+        builder.build(blocks)
     assert backend.rows == []  # nothing was written
 
 
@@ -88,14 +90,18 @@ def test_a_family_provided_by_a_later_block_is_not_enough() -> None:
     backend = FakeRecordingBackend()
     consumer = _block("consumer", requires=frozenset({"bins"}))
     producer = _block("producer", provides=frozenset({"bins"}))
+    builder = ModelBuilder(_data(), backend)
+    blocks = [consumer, producer]
     with pytest.raises(ModelBuildError, match="bins"):
-        ModelBuilder(_data(), backend).build([consumer, producer])
+        builder.build(blocks)
 
 
 def test_two_blocks_with_the_same_name_are_an_error() -> None:
     backend = FakeRecordingBackend()
+    builder = ModelBuilder(_data(), backend)
+    blocks = [_block("dup"), _block("dup")]
     with pytest.raises(ModelBuildError, match="same name"):
-        ModelBuilder(_data(), backend).build([_block("dup"), _block("dup")])
+        builder.build(blocks)
     assert backend.variables == []
 
 
@@ -117,5 +123,6 @@ def test_the_overlap_block_provides_the_order_and_same_families() -> None:
     reader = _block("reader", requires=frozenset({"order"}))
     backend = FakeRecordingBackend()
     ModelBuilder(_data(), backend).build([overlap, reader])  # no error: provided before
+    builder = ModelBuilder(_data(), FakeRecordingBackend())
     with pytest.raises(ModelBuildError, match="reader"):
-        ModelBuilder(_data(), FakeRecordingBackend()).build([reader, overlap])
+        builder.build([reader, overlap])

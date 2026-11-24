@@ -70,7 +70,8 @@ def test_under_soft_deadlines_no_rejection_variable_exists() -> None:
 def test_assignment_and_window_variables_are_binary() -> None:
     backend, variables = _create(DeadlineMode.HARD)
     u = backend.variables[variables.u(TaskKey("r1", 0), "S2", 0)]
-    assert u.kind is VarKind.BINARY and (u.lb, u.ub) == (0.0, 1.0)
+    assert u.kind is VarKind.BINARY
+    assert (u.lb, u.ub) == (0.0, 1.0)
 
 
 def test_x_is_the_sum_of_the_windows_of_its_satellite() -> None:

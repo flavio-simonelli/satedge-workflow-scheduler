@@ -45,7 +45,8 @@ def test_response_and_tardiness_follow_from_the_delivery() -> None:
             # in hard mode every accepted request is delivered by its limit
             assert entry.tardiness == pytest.approx(0.0)
         else:
-            assert entry.response is None and entry.tardiness is None
+            assert entry.response is None
+            assert entry.tardiness is None
 
 
 def test_counts_split_the_requests_by_priority() -> None:

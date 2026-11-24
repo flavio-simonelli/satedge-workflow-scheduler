@@ -90,6 +90,7 @@ def test_the_strengthened_model_has_the_same_optimum_as_the_plain_one() -> None:
         ),
         GurobiBackend,
     ).solve(sample_instance())
-    assert plain.objective is not None and strengthened.objective is not None
+    assert plain.objective is not None
+    assert strengthened.objective is not None
     assert strengthened.objective.primary == pytest.approx(plain.objective.primary)
     assert strengthened.objective.response == pytest.approx(plain.objective.response)

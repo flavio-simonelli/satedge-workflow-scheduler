@@ -59,8 +59,9 @@ def test_rows_are_kept_in_order_with_their_coefficients() -> None:
 def test_a_row_on_an_unknown_variable_is_an_error() -> None:
     backend = FakeRecordingBackend()
     backend.add_var(0.0, 1.0, VarKind.BINARY)
+    bad = (LinExpr.var(5) <= 1).named("bad")
     with pytest.raises(ModelBuildError, match="unknown variable 5"):
-        backend.add_rows([(LinExpr.var(5) <= 1).named("bad")])
+        backend.add_rows([bad])
     assert backend.rows == []
 
 

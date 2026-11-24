@@ -56,7 +56,8 @@ def test_a_polish_that_gets_worse_is_not_accepted() -> None:
     backend.scripted = SolveResult(BackendStatus.OPTIMAL, {x: 1.0}, objective=5.0)
     first = SolveResult(BackendStatus.OPTIMAL, {x: 1.0}, objective=2.0)
     kept = polish(backend, [x], first, SolveParams())
-    assert kept.values == first.values and kept.objective == first.objective
+    assert kept.values == first.values
+    assert kept.objective == first.objective
 
 
 def test_a_polish_that_is_infeasible_keeps_the_first_solution() -> None:
@@ -65,7 +66,8 @@ def test_a_polish_that_is_infeasible_keeps_the_first_solution() -> None:
     backend.scripted = SolveResult(BackendStatus.INFEASIBLE)
     first = SolveResult(BackendStatus.OPTIMAL, {x: 1.0}, objective=2.0)
     kept = polish(backend, [x], first, SolveParams())
-    assert kept.status is first.status and kept.values == first.values
+    assert kept.status is first.status
+    assert kept.values == first.values
     assert kept.objective == first.objective
 
 
@@ -95,5 +97,6 @@ def test_the_polish_with_gurobi_keeps_the_optimum_of_the_routing_level() -> None
         MilpConfig(level=Level.ROUTING, polish=True), GurobiBackend
     ).solve(instance)
     assert check(instance, polished, DeadlineMode.HARD) == ()
-    assert plain.objective is not None and polished.objective is not None
+    assert plain.objective is not None
+    assert polished.objective is not None
     assert polished.objective.response == pytest.approx(plain.objective.response)

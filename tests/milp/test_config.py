@@ -73,8 +73,9 @@ def test_strengthenings_are_accepted_from_level_four() -> None:
 
 
 def test_lazy_plmm_needs_the_plmm_level() -> None:
+    lazy = frozenset({LazyGroup.PLMM})
     with pytest.raises(MilpConfigError, match="level 6"):
-        MilpConfig(level=Level.LINK_CONTENTION, lazy=frozenset({LazyGroup.PLMM}))
+        MilpConfig(level=Level.LINK_CONTENTION, lazy=lazy)
     config = MilpConfig(level=Level.PLMM_CAPACITY, lazy=frozenset({LazyGroup.PLMM}))
     assert config.lazy == {LazyGroup.PLMM}
 

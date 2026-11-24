@@ -119,8 +119,9 @@ def test_soft_objective_is_weighted_tardiness() -> None:
 
 def test_evaluate_rejects_unknown_request() -> None:
     instance = _instance((_request("n", N, 50.0),))
+    outcomes = [RequestOutcome("ghost", False)]
     with pytest.raises(InstanceError):
-        evaluate(instance, [RequestOutcome("ghost", False)], DeadlineMode.HARD)
+        evaluate(instance, outcomes, DeadlineMode.HARD)
 
 
 def test_response_term_is_kept_apart_from_the_primary_term() -> None:
@@ -185,5 +186,6 @@ def test_tardiness_weights_resolution_scales_the_urgent_term() -> None:
 
 
 def test_tardiness_weights_reject_non_positive_resolution() -> None:
+    requests = [_request("n", N, 1.0)]
     with pytest.raises(InstanceError):
-        tardiness_weights([_request("n", N, 1.0)], horizon=10.0, resolution=0.0)
+        tardiness_weights(requests, horizon=10.0, resolution=0.0)

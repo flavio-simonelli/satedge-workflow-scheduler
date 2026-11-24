@@ -92,4 +92,5 @@ def test_order_rows_use_the_larger_limit_of_the_two_requests_as_big_m() -> None:
     assert before.sense is Sense.GE
     assert before.rhs == pytest.approx(-2 * 550.0)
     aux = [v for v in backend.variables if v.name.startswith("order[")]
-    assert aux and all(v.kind.value == "binary" for v in aux)
+    assert aux
+    assert all(v.kind.value == "binary" for v in aux)

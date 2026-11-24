@@ -14,6 +14,7 @@ def test_task_output_must_be_positive() -> None:
 
 
 def test_raw_data_must_be_positive() -> None:
+    task = Task(execution_time=10.0, output_size=1.0)
     with pytest.raises(InstanceError):
         Request(
             id="r",
@@ -22,7 +23,7 @@ def test_raw_data_must_be_positive() -> None:
             release=0.0,
             deadline=100.0,
             raw_size=0.0,
-            tasks=(Task(execution_time=10.0, output_size=1.0),),
+            tasks=(task,),
         )
 
 

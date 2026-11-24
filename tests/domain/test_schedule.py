@@ -18,13 +18,15 @@ B_TASK = TaskExecution("b", 0, "S2", 0.0, 15.0)
 
 
 def test_a_task_cannot_be_executed_twice() -> None:
+    again = TaskExecution("a", 0, "S2", 0.0, 15.0)
     with pytest.raises(InstanceError, match="executed more than once"):
-        Schedule(executions=(A_TASK, TaskExecution("a", 0, "S2", 0.0, 15.0)))
+        Schedule(executions=(A_TASK, again))
 
 
 def test_a_data_item_cannot_use_the_same_arc_twice() -> None:
+    second_hop = Transfer("a", 1, "S1", "G", 30.0, 33.0)
     with pytest.raises(InstanceError, match="same arc"):
-        Schedule(transfers=(A_HOP, Transfer("a", 1, "S1", "G", 30.0, 33.0)))
+        Schedule(transfers=(A_HOP, second_hop))
 
 
 def test_restricted_to_keeps_only_the_given_requests() -> None:

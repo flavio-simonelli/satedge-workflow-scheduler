@@ -57,8 +57,9 @@ def test_scaling_multiplies_terms_and_constant() -> None:
 
 
 def test_products_of_variables_are_not_defined() -> None:
+    x, y = LinExpr.var(0), LinExpr.var(1)
     with pytest.raises(TypeError):
-        _ = LinExpr.var(0) * LinExpr.var(1)  # type: ignore[operator]
+        _ = x * y  # type: ignore[operator]
 
 
 def test_operations_do_not_modify_their_operands() -> None:

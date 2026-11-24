@@ -34,7 +34,9 @@ def test_the_file_holds_the_schedule_the_outcomes_and_the_metrics(
     assert len(data["requests"]) == len(sample_instance().requests)
     assert len(data["executions"]) == len(run.solution.schedule.executions)
     assert len(data["transfers"]) == len(run.solution.schedule.transfers)
-    assert data["plmm"] and data["hpc"] and data["arcs"]
+    assert data["plmm"]
+    assert data["hpc"]
+    assert data["arcs"]
     assert data["violations"] == []
 
 

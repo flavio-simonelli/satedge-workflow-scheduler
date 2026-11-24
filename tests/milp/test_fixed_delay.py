@@ -87,6 +87,7 @@ def test_a_level_three_solution_is_solved_and_no_slower_than_the_routed_level() 
     routed = MilpSolver(MilpConfig(level=Level.ROUTING), GurobiBackend).solve(instance)
     assert fixed.schedule.transfers == ()
     assert all(o.accepted for o in fixed.outcomes)
-    assert fixed.objective is not None and routed.objective is not None
+    assert fixed.objective is not None
+    assert routed.objective is not None
     # the fixed delays are lower bounds of the transfers: the level three is a relaxation
     assert fixed.objective.response <= routed.objective.response + 1e-6
