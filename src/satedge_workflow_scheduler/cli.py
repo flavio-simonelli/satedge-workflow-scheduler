@@ -218,7 +218,7 @@ def _sequential(
 ) -> SequentialConfig:
     if _milp_options_given(args):
         raise UsageError(
-            "--level, --time-limit, --mip-gap, --threads and -v valgono solo per il MILP"
+            "--level, --time-limit, --mip-gap, --threads e -v valgono solo per il MILP"
         )
     config = base if isinstance(base, SequentialConfig) else SequentialConfig()
     if args.deadline is not None:

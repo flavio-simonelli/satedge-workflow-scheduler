@@ -29,7 +29,9 @@ def summary(result: Result) -> str:
         f"Tempo di risposta medio: {_seconds(metrics.mean_response)}",
         f"Obiettivo: {_objective(solution)}",
         f"Tempo del solver: {_seconds(stats.solver_time_s)}; tempo totale: {_seconds(stats.wall_time_s)}",
-        f"Gap: {_number(stats.gap)}; limite inferiore: {_number(stats.bound)}",
+        # the bound of the solver is on the objective of the model, not on the one above:
+        # it stays in the result file, and the gap says whether the solution is optimal
+        f"Gap: {_number(stats.gap)}",
         f"Violazioni: {len(metrics.violations)}",
     ]
     return "\n".join(lines)

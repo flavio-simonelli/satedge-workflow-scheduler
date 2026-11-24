@@ -38,6 +38,25 @@ def _import_gurobipy() -> ModuleType:
     return gurobipy
 
 
+_QUIET_ENV: Any = None
+"""The Gurobi environment of every model, started once with its output off."""
+
+
+def _quiet_env(gp: ModuleType) -> Any:
+    """A Gurobi environment that prints nothing, not even the licence banner.
+
+    A model inherits the output setting of its environment; a verbose solve turns the output
+    back on for its own model only.
+    """
+    global _QUIET_ENV
+    if _QUIET_ENV is None:
+        env = gp.Env(empty=True)
+        env.setParam("OutputFlag", 0)
+        env.start()
+        _QUIET_ENV = env
+    return _QUIET_ENV
+
+
 class GurobiBackend:
     """Builds and solves the model with Gurobi.
 
@@ -47,8 +66,7 @@ class GurobiBackend:
 
     def __init__(self) -> None:
         self._gp = _import_gurobipy()
-        self._model: Any = self._gp.Model()
-        self._model.Params.OutputFlag = 0
+        self._model: Any = self._gp.Model(env=_quiet_env(self._gp))
         self._vars: list[Any] = []
 
     def add_var(self, lb: float, ub: float, kind: VarKind, name: str = "") -> Var:
