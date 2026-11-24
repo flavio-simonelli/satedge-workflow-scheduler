@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
-from types import MappingProxyType
+from types import MappingProxyType, NotImplementedType
 from typing import Self
 
 from satedge_workflow_scheduler.solvers.milp.errors import ModelBuildError
@@ -112,8 +112,15 @@ class LinExpr:
 
     __rmul__ = __mul__
 
+    # Strict inequalities have no linear-constraint form here: refuse them explicitly.
+    def __lt__(self, other: LinExpr | float) -> NotImplementedType:
+        return NotImplemented
+
     def __le__(self, other: LinExpr | float) -> Row:
         return Row.compare(self, Sense.LE, other)
+
+    def __gt__(self, other: LinExpr | float) -> NotImplementedType:
+        return NotImplemented
 
     def __ge__(self, other: LinExpr | float) -> Row:
         return Row.compare(self, Sense.GE, other)

@@ -179,3 +179,11 @@ def test_zero_terms_do_not_reach_a_row_built_from_rejection() -> None:
     row = LinExpr.var(0) >= 3 * (1 - rejection)
     assert dict(row.terms) == {0: 1.0}
     assert row.rhs == 3.0
+
+
+def test_strict_inequalities_are_refused() -> None:
+    # A strict inequality is not a linear constraint: it must not silently become one.
+    with pytest.raises(TypeError):
+        _ = LinExpr.var(0) < 1.0
+    with pytest.raises(TypeError):
+        _ = LinExpr.var(0) > 1.0
