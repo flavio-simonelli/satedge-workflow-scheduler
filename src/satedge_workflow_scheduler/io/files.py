@@ -9,9 +9,14 @@ from pydantic import BaseModel, ValidationError
 
 from satedge_workflow_scheduler.common.errors import SchedulerError
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
-from satedge_workflow_scheduler.io.documents import InstanceDoc
+from satedge_workflow_scheduler.io.documents import InstanceDoc, SolverDoc
 from satedge_workflow_scheduler.io.errors import DocumentError
-from satedge_workflow_scheduler.io.translate import instance_from_document
+from satedge_workflow_scheduler.io.translate import (
+    instance_from_document,
+    solver_config_from_document,
+)
+from satedge_workflow_scheduler.solvers.milp.config import MilpConfig
+from satedge_workflow_scheduler.solvers.sequential.config import SequentialConfig
 
 
 def load_instance(path: str | Path) -> ProblemInstance:
@@ -29,6 +34,23 @@ def load_instance(path: str | Path) -> ProblemInstance:
         doc = doc.model_copy(update={"name": file.stem})
     try:
         return instance_from_document(doc)
+    except SchedulerError as error:
+        raise DocumentError(f"{file}: {error}") from error
+    except ValueError as error:
+        raise DocumentError(f"{file}: {error}") from error
+
+
+def load_solver_config(path: str | Path) -> MilpConfig | SequentialConfig:
+    """The solver configuration described by the YAML file at ``path``.
+
+    Raises:
+        DocumentError: If the file cannot be read, does not match the format, or describes an
+            invalid configuration.
+    """
+    file = Path(path)
+    doc = read_document(file, SolverDoc)
+    try:
+        return solver_config_from_document(doc)
     except SchedulerError as error:
         raise DocumentError(f"{file}: {error}") from error
     except ValueError as error:
