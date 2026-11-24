@@ -27,7 +27,7 @@ from satedge_workflow_scheduler.io.documents import (
     ViolationDoc,
 )
 from satedge_workflow_scheduler.io.errors import DocumentError
-from satedge_workflow_scheduler.io.translate import schedule_from_documents
+from satedge_workflow_scheduler.io.translate.schedule import schedule_from_documents
 from satedge_workflow_scheduler.scheduling.deadline import DeadlineMode
 from satedge_workflow_scheduler.solvers.run import SolverRun
 
