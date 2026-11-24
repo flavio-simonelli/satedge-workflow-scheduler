@@ -1,0 +1,43 @@
+# Esempio piccolo: 2 piani da 3 satelliti, scritto in forma esplicita.
+# Unità: tempi in secondi, dati in Gb, capacità in Gbps.
+#
+# Ogni piano è un anello: il COM e due satelliti, collegati sempre.
+# I COM sono collegati fra loro e alla stazione di terra solo nelle finestre indicate.
+schema_version: "1.0.0"
+name: piccolo
+ground_station: GS
+horizon_s: 7200
+hpc_rate_gbps: 1.0
+topology:
+  kind: explicit
+  planes:
+    - id: 1
+      com: COM1
+      satellites:
+        - {id: COM1, plmm_capacity_gb: 20, hpc_windows: [{start_s: 0, end_s: 300}, {start_s: 3000, end_s: 3300}]}
+        - {id: P1-A, plmm_capacity_gb: 20, hpc_windows: [{start_s: 300, end_s: 600}, {start_s: 3300, end_s: 3600}]}
+        - {id: P1-B, plmm_capacity_gb: 20, hpc_windows: [{start_s: 600, end_s: 900}, {start_s: 3600, end_s: 3900}]}
+    - id: 2
+      com: COM2
+      satellites:
+        - {id: COM2, plmm_capacity_gb: 20, hpc_windows: [{start_s: 900, end_s: 1200}, {start_s: 3900, end_s: 4200}]}
+        - {id: P2-A, plmm_capacity_gb: 20, hpc_windows: [{start_s: 1200, end_s: 1500}, {start_s: 4200, end_s: 4500}]}
+        - {id: P2-B, plmm_capacity_gb: 20, hpc_windows: [{start_s: 1500, end_s: 1800}, {start_s: 4500, end_s: 4800}]}
+  links:
+    # anello del piano 1
+    - {a: COM1, b: P1-A, capacity_gbps: 1, latency_s: 0.015}
+    - {a: P1-A, b: P1-B, capacity_gbps: 1, latency_s: 0.015}
+    - {a: P1-B, b: COM1, capacity_gbps: 1, latency_s: 0.015}
+    # anello del piano 2
+    - {a: COM2, b: P2-A, capacity_gbps: 1, latency_s: 0.015}
+    - {a: P2-A, b: P2-B, capacity_gbps: 1, latency_s: 0.015}
+    - {a: P2-B, b: COM2, capacity_gbps: 1, latency_s: 0.015}
+    # collegamenti a finestre: fra i COM, e dai COM verso terra
+    - {a: COM1, b: COM2, capacity_gbps: 1, latency_s: 0.015, windows: [{start_s: 1500, end_s: 2100}, {start_s: 4500, end_s: 5100}]}
+    - {a: COM1, b: GS, capacity_gbps: 1, latency_s: 0.015, windows: [{start_s: 2400, end_s: 2580}, {start_s: 5220, end_s: 5400}]}
+    - {a: COM2, b: GS, capacity_gbps: 1, latency_s: 0.015, windows: [{start_s: 3900, end_s: 4080}, {start_s: 6720, end_s: 6900}]}
+requests:
+  # la scadenza, se manca, è il rilascio più il ritardo massimo della classe (urgente: 2 h)
+  - {id: R1, priority: urgent, origin: P1-A, release_s: 0, raw_size_gb: 4, tasks: [{execution_s: 120, output_size_gb: 0.5}, {execution_s: 60, output_size_gb: 0.001}]}
+  - {id: R2, priority: non_urgent, origin: P2-B, release_s: 200, raw_size_gb: 6, tasks: [{execution_s: 150, output_size_gb: 0.001}]}
+  - {id: R3, priority: urgent, origin: P2-A, release_s: 400, raw_size_gb: 3, tasks: [{execution_s: 90, output_size_gb: 0.001}]}

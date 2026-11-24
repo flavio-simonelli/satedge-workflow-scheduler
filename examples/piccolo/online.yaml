@@ -1,0 +1,37 @@
+# Stato online dell'epoca che inizia a 600 s, da usare con instance.yaml (--online).
+# R1 è già pianificata: il suo calendario è impegnato e non cambia.
+# Il nuovo piano raggiunge i satelliti del piano 1 a 600 s e quelli del piano 2 a 660 s:
+# prima di questi istanti nessun task o trasferimento nuovo può partire da loro.
+schema_version: 1.0.0
+plan_release_s:
+  COM1: 600.0
+  P1-A: 600.0
+  P1-B: 600.0
+  COM2: 660.0
+  P2-A: 660.0
+  P2-B: 660.0
+committed:
+  executions:
+  - request: R1
+    task: 0
+    satellite: COM1
+    start_s: 4.014999999999986
+    end_s: 128.515
+  - request: R1
+    task: 1
+    satellite: COM1
+    start_s: 128.515
+    end_s: 189.016
+  transfers:
+  - request: R1
+    data: 0
+    source: P1-A
+    target: COM1
+    start_s: 0.0
+    end_s: 4.0
+  - request: R1
+    data: 2
+    source: COM1
+    target: GS
+    start_s: 2400.0
+    end_s: 2400.001

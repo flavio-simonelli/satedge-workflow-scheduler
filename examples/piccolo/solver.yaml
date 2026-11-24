@@ -1,0 +1,4 @@
+# Euristica sequenziale: veloce, senza licenza Gurobi.
+schema_version: "1.0.0"
+method: sequential
+deadline: hard
