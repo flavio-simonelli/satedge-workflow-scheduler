@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pianificazione della costellazione</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink-1: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --band: #ecebe6;
+    --link: #c3c2b7;
+    --link-open: #52514e;
+    --border: rgba(11, 11, 11, 0.10);
+    --highlight: #fff3c4;
+    --s0: #2a78d6; --s1: #eb6834; --s2: #1baf7a; --s3: #eda100;
+    --s4: #e87ba4; --s5: #008300; --s6: #6250d6; --s7: #e34948;
+    --mono: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink-1: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835; --band: #262624; --link: #45443f; --link-open: #c3c2b7;
+      --border: rgba(255, 255, 255, 0.10); --highlight: #3a3320;
+      --s0: #3987e5; --s1: #d95926; --s2: #199e70; --s3: #c98500;
+      --s4: #d55181; --s5: #0ca30c; --s6: #9085e9; --s7: #e66767; --mono: #3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink-1: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --band: #262624; --link: #45443f; --link-open: #c3c2b7;
+    --border: rgba(255, 255, 255, 0.10); --highlight: #3a3320;
+    --s0: #3987e5; --s1: #d95926; --s2: #199e70; --s3: #c98500;
+    --s4: #d55181; --s5: #0ca30c; --s6: #9085e9; --s7: #e66767; --mono: #3987e5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink-1);
+         font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .app { max-width: 1500px; margin: 0 auto; padding: 16px 20px 32px; }
+  header h1 { font-size: 20px; font-weight: 600; margin: 0; }
+  header p { margin: 2px 0 0; color: var(--ink-2); }
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 14px 0;
+              padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+              position: sticky; top: 0; z-index: 5; }
+  .controls label { display: flex; align-items: center; gap: 8px; color: var(--ink-2); }
+  select, button { font: inherit; color: var(--ink-1); background: var(--surface);
+                   border: 1px solid var(--axis); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+  button:hover, select:hover { border-color: var(--ink-2); }
+  button[aria-pressed="true"] { background: var(--ink-1); color: var(--surface); }
+  .time { display: flex; align-items: center; gap: 8px; flex: 1 1 520px; }
+  .time input[type=range] { flex: 1; accent-color: var(--ink-1); }
+  output { font-variant-numeric: tabular-nums; min-width: 92px; font-weight: 600; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(320px, 1fr); gap: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+  .card.wide { grid-column: 1 / -1; }
+  h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+  h2 .sub { font-weight: 400; color: var(--ink-2); }
+  svg { display: block; width: 100%; height: auto; }
+  svg text { fill: var(--ink-2); font-size: 12px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; color: var(--ink-2); font-size: 13px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .key-line { width: 18px; height: 0; border-top-width: 3px; border-top-style: solid; display: inline-block; }
+  .key-box { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .key-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--ink-2); }
+  #status { margin: 0 0 16px; padding: 10px 12px; background: var(--page); border-radius: 6px; min-height: 64px; }
+  #status p { margin: 0 0 4px; }
+  #status strong { font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 4px 6px; border-bottom: 1px solid var(--grid); }
+  td { padding: 5px 6px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th.num { text-align: right; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--page); }
+  tbody tr.now { background: var(--highlight); }
+  tbody tr.future td { color: var(--muted); }
+  .badge { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px;
+           border-radius: 11px; font-size: 12px; font-weight: 600; color: #fff; padding: 0 5px; }
+  .toggle { color: var(--ink-2); font-size: 13px; display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; font-weight: 400; }
+  .tip { position: fixed; pointer-events: none; z-index: 20; background: var(--surface); color: var(--ink-1);
+         border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px;
+         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14); max-width: 300px; }
+  .tip .value { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tip .label { color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+  .empty { color: var(--muted); font-style: italic; }
+  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 1 1 100%; }
+  .pick-label { color: var(--ink-2); margin-right: 4px; }
+  button.chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; }
+  button.chip[aria-pressed="false"] { color: var(--muted); }
+  button.chip[aria-pressed="false"] .key-box { opacity: 0.3; }
+  button.chip[aria-pressed="true"] { background: var(--page); color: var(--ink-1); border-color: var(--ink-2); font-weight: 600; }
+  button.chip .note { color: var(--muted); font-weight: 400; margin-left: 2px; }
+  button.ghost { border-color: transparent; color: var(--ink-2); }
+  .events-scroll { max-height: 460px; overflow-y: auto; }
+  #status .key-box { margin-right: 6px; vertical-align: -1px; }
+  .key-box { flex: none; }
+  @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1 id="title"></h1>
+    <p id="subtitle"></p>
+  </header>
+
+  <div class="controls" role="toolbar" aria-label="Controlli">
+    <div class="pick" role="group" aria-label="Richieste da mostrare">
+      <span class="pick-label">Richieste</span>
+      <span id="chips"></span>
+      <button id="all" class="ghost">Tutte</button>
+      <button id="none" class="ghost">Nessuna</button>
+    </div>
+    <div class="time">
+      <button id="prev" title="Evento precedente (freccia sinistra)">◀ evento</button>
+      <input id="time" type="range" min="0" step="0.001" aria-label="Istante in minuti">
+      <button id="next" title="Evento successivo (freccia destra)">evento ▶</button>
+      <button id="play" aria-pressed="false" title="Scorre gli eventi delle richieste scelte">▶ riproduci</button>
+      <output id="now" for="time"></output>
+    </div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Rete e percorsi <span id="map-requests" class="sub"></span></h2>
+      <svg id="map" role="img" aria-label="Mappa della costellazione con i percorsi delle richieste scelte"></svg>
+      <div class="legend" id="map-legend"></div>
+    </section>
+
+    <section class="card">
+      <h2>All'istante <span id="now-label" class="sub"></span></h2>
+      <div id="status" aria-live="polite"></div>
+      <h2>Eventi <span class="sub">(tempi mm:ss.mmm · clic per andare all'istante)</span></h2>
+      <div class="events-scroll">
+        <table>
+          <thead><tr><th>#</th><th>rich.</th><th>evento</th><th class="num">inizio</th><th class="num">fine</th></tr></thead>
+          <tbody id="events"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card wide">
+      <h2>Calcolo HPC <span class="sub">— finestre di calcolo in grigio, asse in minuti</span></h2>
+      <svg id="hpc" role="img" aria-label="Gantt del calcolo"></svg>
+      <div class="legend" id="requests-legend"></div>
+    </section>
+
+    <section class="card wide">
+      <h2>Trasferimenti <span class="sub">— finestre di visibilità in grigio, asse in minuti</span>
+        <label class="toggle"><input type="checkbox" id="only-selected" checked> solo gli archi delle richieste scelte</label>
+      </h2>
+      <svg id="links" role="img" aria-label="Gantt dei trasferimenti"></svg>
+    </section>
+  </div>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script type="application/json" id="data">__DATA__</script>
+<script>
+"use strict";
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const NS = "http://www.w3.org/2000/svg";
+const $ = (id) => document.getElementById(id);
+const EPS = 1e-7;
+
+// ---- helpers --------------------------------------------------------------------------------
+function svgEl(tag, attrs, text) {
+  const node = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) node.setAttribute(k, v);
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+// a time in minutes as mm:ss.mmm, exact to the millisecond
+function clock(minutes) {
+  const total = Math.round(minutes * 60000);
+  const mm = Math.floor(total / 60000), rest = total - mm * 60000;
+  const ss = Math.floor(rest / 1000), ms = rest % 1000;
+  return `${mm}:${String(ss).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
+}
+function short(minutes) {  // mm:ss, for the labels on the map
+  const total = Math.round(minutes * 60);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+function article(data) { return data.startsWith("output") ? "l'" + data : "il " + data; }
+function colour(req) { return req.slot >= 0 ? `var(--s${req.slot % 8})` : "var(--mono)"; }
+function inkOn(req) { return req.slot % 8 === 3 ? "#0b0b0b" : "#ffffff"; }  // yellow fill takes dark text
+const byId = Object.fromEntries(DATA.requests.map((r) => [r.id, r]));
+const nodeById = Object.fromEntries(DATA.nodes.map((n) => [n.id, n]));
+const order = Object.fromEntries(DATA.requests.map((r, i) => [r.id, i]));
+
+// ---- state ----------------------------------------------------------------------------------
+const state = { selected: new Set([DATA.requests[0].id]), t: 0, playing: null };
+function chosen() { return DATA.requests.filter((r) => state.selected.has(r.id)); }
+
+// every event of the chosen requests, in time order; transmissions are numbered in that order
+function events() {
+  const list = [];
+  for (const r of chosen()) {
+    for (const k of r.tasks) list.push({ kind: "task", req: r, start: k.start, end: k.end, task: k });
+    for (const h of r.hops) list.push({ kind: "hop", req: r, start: h.start, end: h.arrival, hop: h });
+  }
+  list.sort((a, b) => a.start - b.start || a.end - b.end || order[a.req.id] - order[b.req.id]);
+  let n = 0;
+  for (const e of list) if (e.kind === "hop") e.n = ++n;
+  return list;
+}
+function firstTime() {
+  const e = events();
+  if (e.length) return e[0].start;
+  const r = chosen();
+  return r.length ? Math.min(...r.map((q) => q.release)) : 0;
+}
+
+// ---- tooltip --------------------------------------------------------------------------------
+const tip = $("tip");
+function showTip(evt, value, label, swatch) {
+  clear(tip);
+  const v = document.createElement("div"); v.className = "value"; v.textContent = value;
+  const l = document.createElement("div"); l.className = "label";
+  if (swatch) { const k = document.createElement("span"); k.className = "key-line"; k.style.borderTopColor = swatch; l.appendChild(k); }
+  l.appendChild(document.createTextNode(label));
+  tip.append(v, l);
+  tip.hidden = false;
+  const pad = 14, r = tip.getBoundingClientRect();
+  let x = evt.clientX + pad, y = evt.clientY + pad;
+  if (x + r.width > window.innerWidth - 8) x = evt.clientX - r.width - pad;
+  if (y + r.height > window.innerHeight - 8) y = evt.clientY - r.height - pad;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function hideTip() { tip.hidden = true; }
+function hover(node, value, label, swatch) {
+  node.addEventListener("pointermove", (e) => showTip(e, value, label, swatch));
+  node.addEventListener("pointerleave", hideTip);
+}
+
+// ---- map ------------------------------------------------------------------------------------
+const map = $("map");
+map.setAttribute("viewBox", `0 0 ${DATA.view.width} ${DATA.view.height}`);
+function openAt(windows, t) { return !windows || windows.some(([a, b]) => t >= a && t < b); }
+
+function drawMap(evs) {
+  clear(map);
+  const t = state.t;
+  const reqs = chosen();
+  const defs = svgEl("defs");
+  for (const r of reqs) {
+    const m = svgEl("marker", { id: `head-${order[r.id]}`, viewBox: "0 0 10 10", refX: 8, refY: 5, markerWidth: 5, markerHeight: 5, orient: "auto-start-reverse" });
+    m.appendChild(svgEl("path", { d: "M0,0 L10,5 L0,10 z", fill: colour(r) }));
+    defs.appendChild(m);
+  }
+  map.appendChild(defs);
+
+  for (const p of DATA.planes) map.appendChild(svgEl("text", { x: p.x, y: p.y, "text-anchor": "middle", style: "font-weight:600;font-size:13px;fill:var(--ink-2)" }, p.label));
+
+  for (const a of DATA.arcs) {
+    const open = openAt(a.windows, t);
+    const attrs = { x1: a.x1, y1: a.y1, x2: a.x2, y2: a.y2, "stroke-width": a.windows && open ? 2 : 1.25, stroke: a.windows && open ? "var(--link-open)" : "var(--link)" };
+    if (a.windows && !open) attrs["stroke-dasharray"] = "4 4";
+    map.appendChild(svgEl("line", attrs));
+    const hit = svgEl("line", { x1: a.x1, y1: a.y1, x2: a.x2, y2: a.y2, stroke: "transparent", "stroke-width": 12 });
+    hover(hit, `${a.s} — ${a.t}`, !a.windows ? "sempre disponibile" : open ? "finestra aperta in questo istante" : "finestra chiusa in questo istante");
+    map.appendChild(hit);
+  }
+
+  // requests that share a directed arc run side by side, a few pixels apart
+  const lanes = new Map();
+  for (const e of evs) if (e.kind === "hop") {
+    const key = `${e.hop.s}>${e.hop.t}`;
+    if (!lanes.has(key)) lanes.set(key, []);
+    if (!lanes.get(key).includes(e.req.id)) lanes.get(key).push(e.req.id);
+  }
+  function placed(e) {
+    const h = e.hop, ids = lanes.get(`${h.s}>${h.t}`), rank = ids.indexOf(e.req.id);
+    const shift = (rank - (ids.length - 1) / 2) * 7;
+    const dx = h.x2 - h.x1, dy = h.y2 - h.y1, len = Math.hypot(dx, dy) || 1;
+    const nx = (-dy / len) * shift, ny = (dx / len) * shift;
+    const twin = e.req.hops.some((o) => o.s === h.t && o.t === h.s);
+    const at = (twin ? 0.28 : 0.45) + rank * 0.1;
+    return { x1: h.x1 + nx, y1: h.y1 + ny, x2: h.x2 + nx, y2: h.y2 + ny, at };
+  }
+  const hops = evs.filter((e) => e.kind === "hop");
+  for (const e of hops) {
+    const h = e.hop, p = placed(e), col = colour(e.req);
+    const done = t >= h.arrival - EPS, active = t >= h.start - EPS && t < h.arrival - EPS;
+    map.appendChild(svgEl("line", { x1: p.x1, y1: p.y1, x2: p.x2, y2: p.y2, stroke: col, "stroke-width": active ? 5 : 3,
+      "stroke-linecap": "round", "marker-end": `url(#head-${order[e.req.id]})`, opacity: done || active ? 1 : 0.3 }));
+    if (active) {
+      const f = h.end > h.start ? Math.min((t - h.start) / (h.end - h.start), 1) : 1;
+      map.appendChild(svgEl("circle", { cx: p.x1 + (p.x2 - p.x1) * f, cy: p.y1 + (p.y2 - p.y1) * f, r: 7, fill: col, stroke: "var(--surface)", "stroke-width": 2 }));
+    }
+  }
+  for (const e of hops) {
+    const h = e.hop, p = placed(e), col = colour(e.req);
+    const done = t >= h.arrival - EPS, active = t >= h.start - EPS && t < h.arrival - EPS;
+    // with several requests on the map, only what has happened carries a number
+    if (state.selected.size > 1 && !done && !active) continue;
+    const x = p.x1 + (p.x2 - p.x1) * p.at, y = p.y1 + (p.y2 - p.y1) * p.at;
+    const g = svgEl("g", { opacity: done || active ? 1 : 0.45, style: "cursor:pointer" });
+    g.appendChild(svgEl("circle", { cx: x, cy: y, r: 11, fill: col, stroke: "var(--surface)", "stroke-width": 2 }));
+    g.appendChild(svgEl("text", { x, y, "text-anchor": "middle", "dominant-baseline": "central", style: `fill:${inkOn(e.req)};font-size:11px;font-weight:600` }, String(e.n)));
+    hover(g, `${clock(h.start)} → arrivo ${clock(h.arrival)}`, `${e.n}. ${e.req.id} · ${h.data}: ${h.s} → ${h.t}`, col);
+    g.addEventListener("click", () => setTime(h.start));
+    map.appendChild(g);
+  }
+
+  // nodes, and the satellites that run a task of a chosen request
+  const tasksOn = new Map();
+  for (const e of evs) if (e.kind === "task") {
+    if (!tasksOn.has(e.task.sat)) tasksOn.set(e.task.sat, []);
+    tasksOn.get(e.task.sat).push(e);
+  }
+  for (const n of DATA.nodes) {
+    const here = tasksOn.get(n.id) || [];
+    const fill = here.length ? colour(here[0].req) : "var(--surface)";
+    let shape;
+    if (n.kind === "gs") shape = svgEl("path", { d: star(n.x, n.y, 12, 5), fill: "var(--surface)", stroke: "var(--ink-1)", "stroke-width": 1.5 });
+    else if (n.kind === "com") shape = svgEl("rect", { x: n.x - 8, y: n.y - 8, width: 16, height: 16, rx: 2, fill, stroke: "var(--ink-1)", "stroke-width": 1.5 });
+    else shape = svgEl("circle", { cx: n.x, cy: n.y, r: here.length ? 10 : 6, fill, stroke: here.length ? "var(--surface)" : "var(--ink-2)", "stroke-width": here.length ? 2 : 1.5 });
+    map.appendChild(shape);
+    const running = here.find((e) => t >= e.start - EPS && t < e.end - EPS);
+    if (running) map.appendChild(svgEl("circle", { cx: n.x, cy: n.y, r: 15, fill: "none", stroke: colour(running.req), "stroke-width": 2.5 }));
+    const lx = n.x + n.ox * 18, ly = n.y + n.oy * 18;
+    const anchor = Math.abs(n.ox) < 0.3 ? "middle" : n.ox > 0 ? "start" : "end";
+    map.appendChild(svgEl("text", { x: lx, y: ly, "text-anchor": anchor, "dominant-baseline": "central", style: `font-size:12px;${n.kind !== "sat" ? "font-weight:600;fill:var(--ink-1)" : ""}` }, n.id));
+    const hit = svgEl("circle", { cx: n.x, cy: n.y, r: 14, fill: "transparent" });
+    const what = here.length ? here.map((e) => `${e.req.id} task ${e.task.k}: ${clock(e.start)} – ${clock(e.end)}`).join(" · ")
+      : n.kind === "gs" ? "stazione di terra" : n.kind === "com" ? "nodo COM del piano" : "satellite";
+    hover(hit, n.id, what, here.length ? colour(here[0].req) : null);
+    map.appendChild(hit);
+  }
+
+  // one chip per satellite that computes, inside the ring: a line per task, keyed by its colour
+  for (const [sat, list] of tasksOn) {
+    const n = nodeById[sat];
+    const anchor = n.ox > 0.3 ? "end" : n.ox < -0.3 ? "start" : "middle";
+    const x = n.x - n.ox * 34, y0 = n.y - n.oy * 34 - ((list.length - 1) * 17) / 2;
+    const g = svgEl("g", {});
+    map.appendChild(g);
+    const texts = list.map((e, i) => {
+      const running = t >= e.start - EPS && t < e.end - EPS;
+      const label = `${state.selected.size > 1 ? e.req.id + " " : ""}task ${e.task.k}  ${short(e.start)}–${short(e.end)}`;
+      const text = svgEl("text", { x, y: y0 + i * 17, "dominant-baseline": "central", "text-anchor": anchor,
+        style: `font-size:12px;fill:var(--ink-1);font-weight:${running ? 700 : 500}` }, label);
+      g.appendChild(text);
+      return text;
+    });
+    const boxes = texts.map((x_) => x_.getBBox());
+    const bx = Math.min(...boxes.map((b) => b.x)), by = Math.min(...boxes.map((b) => b.y));
+    const bw = Math.max(...boxes.map((b) => b.x + b.width)) - bx, bh = Math.max(...boxes.map((b) => b.y + b.height)) - by;
+    g.insertBefore(svgEl("rect", { x: bx - 22, y: by - 5, width: bw + 30, height: bh + 10, rx: 5, fill: "var(--surface)", stroke: "var(--border)" }), g.firstChild);
+    list.forEach((e, i) => g.appendChild(svgEl("circle", { cx: bx - 11, cy: boxes[i].y + boxes[i].height / 2, r: 5, fill: colour(e.req) })));
+  }
+
+  if (!reqs.length) map.appendChild(svgEl("text", { x: DATA.view.width / 2, y: 40, "text-anchor": "middle", style: "font-size:14px;fill:var(--muted)" }, "Scegli una o più richieste da mostrare."));
+}
+
+function star(cx, cy, outer, inner) {
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 ? inner : outer, a = -Math.PI / 2 + (i * Math.PI) / 5;
+    pts.push(`${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`);
+  }
+  return "M" + pts.join("L") + "Z";
+}
+
+function drawMapLegend() {
+  const box = $("map-legend"); clear(box);
+  const items = [
+    ["text", null, "frecce: trasmissioni nel colore della richiesta, numerate in ordine di tempo (con più richieste, solo quelle già avvenute)"],
+    ["dot", "var(--ink-2)", "satellite che esegue un task"],
+    ["line", "var(--link)", "collegamento sempre disponibile"],
+    ["line", "var(--link-open)", "finestra di visibilità aperta"],
+    ["dash", "var(--link)", "finestra di visibilità chiusa"],
+  ];
+  for (const [kind, c, text] of items) {
+    const s = document.createElement("span");
+    if (kind !== "text") {
+      const k = document.createElement("i");
+      if (kind === "dot") { k.className = "key-dot"; k.style.background = c; }
+      else { k.className = "key-line"; k.style.borderTopColor = c; if (kind === "dash") k.style.borderTopStyle = "dashed"; }
+      s.appendChild(k);
+    }
+    s.appendChild(document.createTextNode(text)); box.appendChild(s);
+  }
+}
+
+// ---- status and events ----------------------------------------------------------------------
+function describe(evs) {
+  const t = state.t, box = $("status");
+  clear(box);
+  const reqs = chosen();
+  if (!reqs.length) { const p = document.createElement("p"); p.textContent = "Nessuna richiesta scelta."; box.appendChild(p); return; }
+  for (const r of reqs) {
+    const mine = evs.filter((e) => e.req === r);
+    let text;
+    const running = mine.filter((e) => t >= e.start - EPS && t < e.end - EPS);
+    const last = r.hops[r.hops.length - 1];
+    if (!mine.length) text = "non ha attività nella soluzione: è stata rifiutata.";
+    else if (running.length) text = running.map((e) => e.kind === "task"
+        ? `esegue il task ${e.task.k} su ${e.task.sat}, fino a ${clock(e.end)}.`
+        : `trasmette ${article(e.hop.data)} da ${e.hop.s} a ${e.hop.t}, arrivo a ${clock(e.end)}.`).join(" ");
+    else if (t < mine[0].start - EPS) text = `non è ancora partita: il primo evento è a ${clock(mine[0].start)}.`;
+    else if (last && last.t === DATA.ground && t >= last.arrival - EPS) text = `ha consegnato il risultato a terra a ${clock(last.arrival)}.`;
+    else {
+      const before = mine.filter((e) => e.end <= t + EPS).pop();
+      const after = mine.find((e) => e.start > t + EPS);
+      const where = before.kind === "hop" ? before.hop.t : before.task.sat;
+      const next = after.kind === "hop" ? `la trasmissione verso ${after.hop.t} a ${clock(after.start)}` : `il task ${after.task.k} a ${clock(after.start)}`;
+      text = `ha il dato fermo su ${where} e attende ${next}.`;
+    }
+    const p = document.createElement("p");
+    const k = document.createElement("span"); k.className = "key-box"; k.style.background = colour(r);
+    const name = document.createElement("strong"); name.textContent = r.id;
+    p.append(k, name, document.createTextNode(" " + text));
+    box.appendChild(p);
+  }
+}
+
+function drawEvents(evs) {
+  const t = state.t, body = $("events");
+  clear(body);
+  let current = null;
+  for (const e of evs) {
+    const tr = document.createElement("tr");
+    if (t >= e.start - EPS && t < e.end - EPS) { tr.className = "now"; current = current || tr; }
+    else if (e.start > t + EPS) tr.className = "future";
+    const n = document.createElement("td");
+    if (e.kind === "hop") { const b = document.createElement("span"); b.className = "badge"; b.style.background = colour(e.req); b.style.color = inkOn(e.req); b.textContent = e.n; n.appendChild(b); }
+    const who = document.createElement("td");
+    const k = document.createElement("span"); k.className = "key-box"; k.style.background = colour(e.req);
+    who.append(k, document.createTextNode(" " + e.req.id));
+    const what = document.createElement("td");
+    what.textContent = e.kind === "task" ? `task ${e.task.k} su ${e.task.sat}` : `${e.hop.data}: ${e.hop.s} → ${e.hop.t}`;
+    const a = document.createElement("td"); a.className = "num"; a.textContent = clock(e.start);
+    const b = document.createElement("td"); b.className = "num"; b.textContent = clock(e.end);
+    tr.append(n, who, what, a, b);
+    tr.addEventListener("click", () => setTime(e.start));
+    body.appendChild(tr);
+  }
+  // bring the current row into view inside the table only: the page itself must not move
+  if (current) {
+    const box = body.closest(".events-scroll");
+    const row = current.getBoundingClientRect(), view = box.getBoundingClientRect();
+    if (row.top < view.top) box.scrollTop -= view.top - row.top;
+    else if (row.bottom > view.bottom) box.scrollTop += row.bottom - view.bottom;
+  }
+}
+
+// ---- gantt ----------------------------------------------------------------------------------
+function niceStep(span, target) {
+  const raw = span / target;
+  for (const s of [0.5, 1, 2, 5, 10, 15, 20, 30, 60, 120]) if (s >= raw) return s;
+  return 240;
+}
+function domain() {
+  let end = 0;
+  for (const rows of [DATA.computing, DATA.links]) for (const r of rows) for (const it of r.items) end = Math.max(end, it.end);
+  return [0, Math.min(DATA.horizon, end * 1.04 + 1)];
+}
+const [D0, D1] = domain();
+
+function drawGantt(svg, rows, where) {
+  clear(svg);
+  const width = Math.max(svg.clientWidth || 900, 480);
+  const left = 130, right = 16, top = 8, rowH = 26, bar = 12;
+  const height = top + rows.length * rowH + 30;
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  const sx = (m) => left + ((m - D0) / (D1 - D0)) * (width - left - right);
+  const step = niceStep(D1 - D0, Math.max(4, Math.floor((width - left) / 90)));
+  for (let m = Math.ceil(D0 / step) * step; m <= D1 + EPS; m += step) {
+    svg.appendChild(svgEl("line", { x1: sx(m), x2: sx(m), y1: top, y2: top + rows.length * rowH, stroke: "var(--grid)", "stroke-width": 1 }));
+    svg.appendChild(svgEl("text", { x: sx(m), y: height - 10, "text-anchor": "middle", style: "fill:var(--muted);font-variant-numeric:tabular-nums" }, String(m)));
+  }
+  rows.forEach((row, i) => {
+    const y = top + i * rowH;
+    svg.appendChild(svgEl("text", { x: left - 10, y: y + rowH / 2, "text-anchor": "end", "dominant-baseline": "central" }, row.label));
+    for (const [a, b] of row.windows || []) {
+      if (b < D0 || a > D1) continue;
+      svg.appendChild(svgEl("rect", { x: sx(Math.max(a, D0)), y: y + 3, width: Math.max(sx(Math.min(b, D1)) - sx(Math.max(a, D0)), 1), height: rowH - 6, fill: "var(--band)" }));
+    }
+    for (const it of row.items) {
+      const r = byId[it.req], on = state.selected.has(it.req);
+      const x = sx(it.start), w = Math.max(sx(it.end) - x, 4);
+      const rect = svgEl("rect", { x, y: y + (rowH - bar) / 2, width: w, height: bar, rx: 3, fill: colour(r), opacity: on ? 1 : 0.25, style: "cursor:pointer" });
+      hover(rect, `${clock(it.start)} – ${clock(it.end)}`, `${it.req}${r.urgent ? " (urgente)" : ""} · ${it.what}${where ? " su " + row.label : ""}`, colour(r));
+      rect.addEventListener("click", () => { if (!on) toggle(it.req, true); setTime(it.start); });
+      svg.appendChild(rect);
+    }
+  });
+  if (state.t >= D0 && state.t <= D1) svg.appendChild(svgEl("line", { x1: sx(state.t), x2: sx(state.t), y1: top - 4, y2: top + rows.length * rowH, stroke: "var(--ink-1)", "stroke-width": 1.5 }));
+}
+
+function drawGantts() {
+  drawGantt($("hpc"), DATA.computing, true);
+  const links = $("only-selected").checked ? DATA.links.filter((l) => l.items.some((it) => state.selected.has(it.req))) : DATA.links;
+  drawGantt($("links"), links, false);
+}
+
+function drawRequestsLegend() {
+  const box = $("requests-legend"); clear(box);
+  for (const r of DATA.requests) {
+    const s = document.createElement("span"); const k = document.createElement("i");
+    k.className = "key-box"; k.style.background = colour(r);
+    if (!state.selected.has(r.id)) k.style.opacity = 0.25;
+    s.append(k, document.createTextNode(r.id + (r.urgent ? " (urgente)" : "")));
+    box.appendChild(s);
+  }
+  const s = document.createElement("span"); const k = document.createElement("i");
+  k.className = "key-box"; k.style.background = "var(--band)";
+  s.append(k, document.createTextNode("finestra disponibile")); box.appendChild(s);
+}
+
+// ---- controls -------------------------------------------------------------------------------
+const slider = $("time");
+slider.max = DATA.horizon.toFixed(3);
+const chips = $("chips");
+for (const r of DATA.requests) {
+  const b = document.createElement("button");
+  b.className = "chip"; b.dataset.id = r.id;
+  b.title = r.urgent ? "richiesta urgente" : "richiesta non urgente";
+  const k = document.createElement("span"); k.className = "key-box"; k.style.background = colour(r);
+  b.append(k, document.createTextNode(" " + r.id));
+  const note = [r.urgent ? "urg." : "", r.tasks.length ? "" : "rifiutata"].filter(Boolean).join(" · ");
+  if (note) { const s = document.createElement("small"); s.className = "note"; s.textContent = note; b.appendChild(s); }
+  b.addEventListener("click", () => toggle(r.id));
+  chips.appendChild(b);
+}
+function syncChips() { for (const b of chips.children) b.setAttribute("aria-pressed", String(state.selected.has(b.dataset.id))); }
+
+function render() {
+  const evs = events();
+  slider.value = state.t;
+  $("now").value = `${clock(state.t)}`;
+  $("now-label").textContent = `${clock(state.t)} (mm:ss.mmm)`;
+  $("map-requests").textContent = chosen().length ? "— " + chosen().map((r) => r.id).join(", ") : "";
+  syncChips();
+  drawMap(evs); drawMapLegend(); describe(evs); drawEvents(evs); drawGantts(); drawRequestsLegend();
+  history.replaceState(null, "", `#${[...state.selected].map(encodeURIComponent).join(",")}@${state.t.toFixed(4)}`);
+}
+function setTime(t) { state.t = Math.max(0, Math.min(DATA.horizon, t)); render(); }
+function toggle(id, keepTime = false) {
+  if (state.selected.has(id)) state.selected.delete(id); else state.selected.add(id);
+  stop();
+  if (!keepTime && state.selected.size === 1) state.t = firstTime();
+  render();
+}
+function step(direction) {
+  const starts = [...new Set(events().map((e) => Math.round(e.start * 60000)))].sort((a, b) => a - b).map((ms) => ms / 60000);
+  const here = Math.round(state.t * 60000);
+  const target = direction > 0 ? starts.find((s) => Math.round(s * 60000) > here) : starts.filter((s) => Math.round(s * 60000) < here).pop();
+  if (target !== undefined) setTime(target);
+  return target !== undefined;
+}
+function stop() { if (state.playing) { clearInterval(state.playing); state.playing = null; } $("play").setAttribute("aria-pressed", "false"); $("play").textContent = "▶ riproduci"; }
+function play() {
+  if (state.playing) { stop(); return; }
+  $("play").setAttribute("aria-pressed", "true"); $("play").textContent = "■ ferma";
+  state.playing = setInterval(() => { if (!step(1)) stop(); }, 1100);
+}
+
+$("all").addEventListener("click", () => { DATA.requests.forEach((r) => state.selected.add(r.id)); stop(); render(); });
+$("none").addEventListener("click", () => { state.selected.clear(); stop(); render(); });
+slider.addEventListener("input", () => { stop(); setTime(parseFloat(slider.value)); });
+$("prev").addEventListener("click", () => { stop(); step(-1); });
+$("next").addEventListener("click", () => { stop(); step(1); });
+$("play").addEventListener("click", play);
+$("only-selected").addEventListener("change", drawGantts);
+window.addEventListener("resize", drawGantts);
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" && e.target.type !== "range") return;
+  if (e.key === "ArrowRight") { stop(); step(1); e.preventDefault(); }
+  if (e.key === "ArrowLeft") { stop(); step(-1); e.preventDefault(); }
+});
+
+const served = DATA.requests.filter((r) => r.tasks.length).length;
+$("title").textContent = `Pianificazione — ${DATA.name}`;
+$("subtitle").textContent = `${DATA.requests.length} richieste, ${served} servite · orizzonte ${DATA.horizon.toFixed(0)} min · frecce ← → per passare da un evento all'altro`;
+
+// open at the requests and the instant written in the address, if any: #R1,R4@25.3
+const [hashIds, hashTime] = decodeURIComponent(location.hash.slice(1)).split("@");
+const fromHash = (hashIds || "").split(",").filter((id) => byId[id]);
+if (fromHash.length) state.selected = new Set(fromHash);
+state.t = isNaN(parseFloat(hashTime)) ? firstTime() : parseFloat(hashTime);
+render();
+</script>
+</body>
+</html>

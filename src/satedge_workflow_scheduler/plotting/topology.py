@@ -327,3 +327,16 @@ def _link_style(arc: Arc, at: float | None) -> _LinkStyle:
         return _LinkStyle("#8c8c8c", 1.2, "--")
     open_now = any(w.start <= at < w.end for w in arc.availability.windows.windows)
     return _LinkStyle("#333333", 1.4, "-") if open_now else _LinkStyle(_FAINT, 1.2, ":")
+
+
+def node_positions(instance: ProblemInstance) -> dict[NodeId, tuple[float, float]]:
+    """The position of each node on the map, in the units of the map."""
+    return _positions(instance)
+
+
+def hop_segments(
+    instance: ProblemInstance, plan: RoutePlan
+) -> dict[int, tuple[tuple[float, float], tuple[float, float]]]:
+    """The drawn ends of the arrow of each transmission of ``plan``, by its number."""
+    positions = _positions(instance)
+    return {hop.number: _lane(plan, hop, positions) for hop in plan.hops}

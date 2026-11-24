@@ -76,3 +76,21 @@ def test_the_plotting_modules_do_not_load_matplotlib_on_import() -> None:
             pytest.skip("matplotlib already imported by another test")
     importlib.import_module("satedge_workflow_scheduler.plotting.data")
     assert not any(name.startswith("matplotlib") for name in sys.modules)
+
+
+def test_the_page_holds_every_request_and_its_route(tmp_path: Path) -> None:
+    from satedge_workflow_scheduler.plotting.html import page_data, write_page
+
+    instance, result, data = _solved()
+    page = page_data(instance, data)
+    requests = page["requests"]
+    assert isinstance(requests, list)
+    assert [r["id"] for r in requests] == list(data.requests)
+    hops = sum(len(r["hops"]) for r in requests)
+    assert hops == len(result.solution.schedule.transfers)
+
+    file = write_page(tmp_path / "page.html", instance, data)
+    text = file.read_text(encoding="utf-8")
+    assert "__DATA__" not in text
+    # the data is embedded in one script element that nothing in it can close early
+    assert text.count("</script>") == 2

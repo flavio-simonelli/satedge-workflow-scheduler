@@ -8,16 +8,20 @@ UNITS: dict[str, float] = {"s": 1.0, "min": 60.0, "h": 3600.0}
 """Seconds in one unit of the time axis."""
 
 PALETTE: tuple[str, ...] = (
-    "#0072B2",  # blue
-    "#E69F00",  # orange
-    "#009E73",  # green
-    "#CC79A7",  # pink
-    "#56B4E9",  # sky blue
-    "#D55E00",  # vermilion
-    "#F0E442",  # yellow
-    "#000000",  # black
+    "#2a78d6",  # blue
+    "#eb6834",  # orange
+    "#1baf7a",  # aqua
+    "#eda100",  # yellow
+    "#e87ba4",  # magenta
+    "#008300",  # green
+    "#6250d6",  # violet
+    "#e34948",  # red
 )
-"""Colour-blind safe palette, from Okabe and Ito; the colours repeat after eight requests."""
+"""Categorical palette, in this order: adjacent colours stay apart for colour-blind readers.
+
+The order is the safety mechanism. Past eight requests the colours repeat, so the figures
+with many requests also name them (legend, labels, tables).
+"""
 
 BAND = "#d9d9d9"
 

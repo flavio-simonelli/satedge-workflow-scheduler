@@ -21,6 +21,7 @@ from satedge_workflow_scheduler.plotting.figures import (
     route_figure,
     transfers_figure,
 )
+from satedge_workflow_scheduler.plotting.html import write_page
 from satedge_workflow_scheduler.plotting.save import save
 from satedge_workflow_scheduler.plotting.style import request_colors
 from satedge_workflow_scheduler.solvers.sequential.config import SequentialConfig
@@ -53,6 +54,7 @@ def main() -> None:
         )
     for name, figure in figures.items():
         print(save(figure, args.out / f"{name}.png"))
+    print(write_page(args.out / "soluzione.html", instance, data))
 
 
 if __name__ == "__main__":
