@@ -132,3 +132,117 @@ class InstanceDoc(_Document):
                 f"{SCHEMA_VERSION!r} and its minor versions"
             )
         return value
+
+
+class ExecutionDoc(_Document):
+    """A task run on a satellite."""
+
+    request: str
+    task: int
+    satellite: str
+    start_s: float
+    end_s: float
+
+
+class TransferDoc(_Document):
+    """A transmission of one data item on an arc."""
+
+    request: str
+    data: int
+    source: str
+    target: str
+    start_s: float
+    end_s: float
+
+
+class RequestResultDoc(_Document):
+    """Outcome and timing of one request."""
+
+    id: str
+    priority: Priority
+    committed: bool
+    accepted: bool
+    rejection_reason: str | None = None
+    release_s: float
+    limit_s: float
+    delivery_s: float | None = None
+    response_s: float | None = None
+    tardiness_s: float | None = None
+
+
+class ObjectiveDoc(_Document):
+    """The two terms of the objective."""
+
+    primary: float
+    response: float
+
+
+class StatisticsDoc(_Document):
+    """What the solve cost; a field is ``null`` if the method does not report it."""
+
+    method: str
+    wall_time_s: float | None = None
+    solver_time_s: float | None = None
+    bound: float | None = None
+    gap: float | None = None
+    nodes: float | None = None
+    rounds: int = 1
+    binary_variables: int | None = None
+    constraints: int | None = None
+
+
+class PlmmResultDoc(_Document):
+    """Peak memory load of the PLMM of a satellite."""
+
+    satellite: str
+    capacity_gb: float
+    peak_gb: float
+    peak_time_s: float | None = None
+
+
+class HpcResultDoc(_Document):
+    """Use of the computing windows of a satellite."""
+
+    satellite: str
+    available_s: float
+    busy_s: float
+    utilisation: float
+
+
+class ArcResultDoc(_Document):
+    """Use of an arc of the network."""
+
+    source: str
+    target: str
+    busy_s: float
+    volume_gb: float
+
+
+class ViolationDoc(_Document):
+    """A rule that the solution breaks."""
+
+    constraint: str
+    request: str | None = None
+    message: str
+
+
+class ResultDoc(_Document):
+    """The result of one solve, as written to the JSON file.
+
+    The schedule and the outcomes are enough to rebuild the solution; the metrics are derived
+    from them and are written for the reader of the file.
+    """
+
+    schema_version: str = SCHEMA_VERSION
+    instance: str
+    deadline: str
+    status: str
+    objective: ObjectiveDoc | None = None
+    statistics: StatisticsDoc
+    requests: list[RequestResultDoc] = Field(default_factory=list)
+    executions: list[ExecutionDoc] = Field(default_factory=list)
+    transfers: list[TransferDoc] = Field(default_factory=list)
+    plmm: list[PlmmResultDoc] = Field(default_factory=list)
+    hpc: list[HpcResultDoc] = Field(default_factory=list)
+    arcs: list[ArcResultDoc] = Field(default_factory=list)
+    violations: list[ViolationDoc] = Field(default_factory=list)
