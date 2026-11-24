@@ -47,3 +47,7 @@ gurobi.log
 *.lp
 *.mps
 *.ilp
+
+# Report generati da SonarCloud/CI
+coverage.xml
+test-results.xml
