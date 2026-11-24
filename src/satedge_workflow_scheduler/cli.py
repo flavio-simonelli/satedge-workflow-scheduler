@@ -47,6 +47,9 @@ class UsageError(SchedulerError):
     """The options given to a command do not fit together."""
 
 
+_INSTANCE_HELP = "file YAML dell'istanza"
+
+
 def build_parser() -> argparse.ArgumentParser:
     """The parser of the command line."""
     parser = argparse.ArgumentParser(
@@ -57,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True, metavar="COMANDO")
 
     solve = commands.add_parser("solve", help="risolve un'istanza")
-    solve.add_argument("instance", type=Path, help="file YAML dell'istanza")
+    solve.add_argument("instance", type=Path, help=_INSTANCE_HELP)
     _instance_options(solve)
     solve.add_argument("-s", "--solver", type=Path, help="file YAML del solver")
     solve.add_argument(
@@ -89,7 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
     solve.set_defaults(handler=_solve)
 
     check_cmd = commands.add_parser("check", help="verifica un risultato sull'istanza")
-    check_cmd.add_argument("instance", type=Path, help="file YAML dell'istanza")
+    check_cmd.add_argument("instance", type=Path, help=_INSTANCE_HELP)
     check_cmd.add_argument("result", type=Path, help="file JSON del risultato")
     _instance_options(check_cmd)
     check_cmd.set_defaults(handler=_check)
@@ -97,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
     compare = commands.add_parser(
         "compare", help="confronta più solutori sulla stessa istanza"
     )
-    compare.add_argument("instance", type=Path, help="file YAML dell'istanza")
+    compare.add_argument("instance", type=Path, help=_INSTANCE_HELP)
     compare.add_argument(
         "solvers", type=Path, nargs="+", metavar="SOLVER", help="file YAML dei solutori"
     )

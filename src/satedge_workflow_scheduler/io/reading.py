@@ -41,5 +41,10 @@ def _describe(path: Path, error: ValidationError) -> str:
 def _location(loc: tuple[int | str, ...]) -> str:
     text = ""
     for part in loc:
-        text += f"[{part}]" if isinstance(part, int) else (f".{part}" if text else part)
+        if isinstance(part, int):
+            text += f"[{part}]"
+        elif text:
+            text += f".{part}"
+        else:
+            text = part
     return text or "(document)"

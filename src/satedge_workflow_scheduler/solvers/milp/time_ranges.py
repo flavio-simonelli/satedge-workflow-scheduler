@@ -107,10 +107,7 @@ class RequestRanges:
     @property
     def realizable(self) -> bool:
         """Whether every task can run on some satellite: if not, the request is never served."""
-        return all(
-            any(windows for windows in per_satellite.values())
-            for per_satellite in self.tasks.values()
-        )
+        return all(any(per_satellite.values()) for per_satellite in self.tasks.values())
 
     def task(self, i: TaskKey, satellite: NodeId) -> Mapping[int, Span]:
         """The compatible windows of the task on ``satellite``, with ``I^task`` in each."""

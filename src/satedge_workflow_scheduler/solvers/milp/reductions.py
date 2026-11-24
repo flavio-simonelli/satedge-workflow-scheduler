@@ -102,6 +102,11 @@ class Reductions:
         """No reduction: every variable and constraint of the model as written."""
         sats = data.satellites
         every_window = {s: tuple(range(len(data.hpc_windows(s)))) for s in sats}
+        link_counts = {
+            e: len(windows)
+            for e in data.arc_ids
+            if (windows := data.link_windows(e)) is not None
+        }
         return cls(
             excluded=frozenset(),
             task_windows={(i, s): every_window[s] for i in data.tasks for s in sats},
@@ -111,10 +116,9 @@ class Reductions:
             },
             arcs={a: data.arc_ids for a in data.data},
             link_windows={
-                (a, e): tuple(range(len(windows)))
+                (a, e): tuple(range(count))
                 for a in data.data
-                for e in data.arc_ids
-                if (windows := data.link_windows(e)) is not None
+                for e, count in link_counts.items()
             },
             link_triples=tuple(
                 (a, b, e) for a, b in data.link_pairs for e in data.arc_ids

@@ -84,9 +84,7 @@ class SolveStrategy(Protocol):
         ...
 
 
-def warm_start_of(
-    instance: ProblemInstance, data: ModelData, config: MilpConfig
-) -> Schedule | None:
+def warm_start_of(instance: ProblemInstance, config: MilpConfig) -> Schedule | None:
     """The calendar the solve starts from, or ``None`` if it starts from nothing.
 
     The calendar is the one of the sequential heuristic (priority-EDF, EFT, safe intervals), when
@@ -190,7 +188,7 @@ class DirectSolve:
             SolverError: If the solver fails or stops without a valid solution.
         """
         reductions = reductions_for(data, config.reductions)
-        start = warm_start_of(instance, data, config)
+        start = warm_start_of(instance, config)
         attempt = solve_once(
             instance, data, reductions, config, backend, None, config.solve, start
         )
@@ -261,7 +259,7 @@ class LazySolve:
         """
         started = time.monotonic()
         reductions = reductions_for(data, config.reductions)
-        start = warm_start_of(instance, data, config)
+        start = warm_start_of(instance, config)
         written: dict[LazyGroup, frozenset[Any]] = {
             c.group: frozenset() for c in self._constraints
         }

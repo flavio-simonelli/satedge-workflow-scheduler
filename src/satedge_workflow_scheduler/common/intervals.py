@@ -77,7 +77,7 @@ class WindowSet:
     def __init__(self, windows: Iterable[TimeWindow] = ()) -> None:
         items = tuple(windows)
         for previous, current in itertools.pairwise(items):
-            if not previous.end < current.start:
+            if previous.end >= current.start:
                 raise ValueError(
                     "windows must be sorted and disjoint: "
                     f"[{previous.start}, {previous.end}] then "
