@@ -1,0 +1,27 @@
+# Caso di studio: 2 piani da 9 satelliti, una stazione a terra.
+# Unità: tempi in secondi, dati in Gb, capacità in Gbps.
+# Le finestre di visibilità non sono qui: stanno in contact_plan.yaml.
+schema_version: "1.0.0"
+name: casostudio
+ground_station: GS
+horizon_s: 28800
+hpc_rate_gbps: 1.0
+topology:
+  kind: ring_constellation
+  planes: 2
+  satellites_per_plane: 9
+  com_index: 0                 # il satellite 0 di ogni piano è il COM
+  plmm_capacity_gb: 2000       # capacità netta della PLMM: da confermare col caso di studio
+  hpc: {period_s: 5640, duration_s: 300, startup_s: 0}
+  intra_link: {capacity_gbps: 1, latency_s: 0.015}
+  inter_link: {capacity_gbps: 1, latency_s: 0.015}
+  ground_link: {capacity_gbps: 1, latency_s: 0.015}
+requests:
+  - {id: R1, priority: urgent, origin: P1-S3, release_s: 0, raw_size_gb: 8, tasks: [{execution_s: 120, output_size_gb: 0.5}, {execution_s: 90, output_size_gb: 0.001}]}
+  - {id: R2, priority: non_urgent, origin: P2-S5, release_s: 300, raw_size_gb: 12, tasks: [{execution_s: 150, output_size_gb: 0.001}]}
+  - {id: R3, priority: urgent, origin: P1-S7, release_s: 900, raw_size_gb: 6, tasks: [{execution_s: 100, output_size_gb: 0.3}, {execution_s: 80, output_size_gb: 0.001}]}
+  - {id: R4, priority: non_urgent, origin: P2-S2, release_s: 1500, raw_size_gb: 10, tasks: [{execution_s: 140, output_size_gb: 1.2}, {execution_s: 60, output_size_gb: 0.001}]}
+  - {id: R5, priority: urgent, origin: P2-S6, release_s: 2400, raw_size_gb: 4, tasks: [{execution_s: 110, output_size_gb: 0.001}]}
+  - {id: R6, priority: non_urgent, origin: P1-S5, release_s: 3600, raw_size_gb: 9, tasks: [{execution_s: 130, output_size_gb: 0.8}, {execution_s: 90, output_size_gb: 0.001}]}
+  - {id: R7, priority: urgent, origin: P2-S8, release_s: 5000, raw_size_gb: 7, tasks: [{execution_s: 100, output_size_gb: 0.2}, {execution_s: 70, output_size_gb: 0.001}]}
+  - {id: R8, priority: non_urgent, origin: P1-S2, release_s: 7000, raw_size_gb: 11, tasks: [{execution_s: 160, output_size_gb: 0.001}]}

@@ -1,0 +1,5 @@
+schema_version: "1.0.0"
+links:
+  - {a: COM1, b: COM2, windows: [{start_s: 1500, end_s: 2100}, {start_s: 7140, end_s: 7740}, {start_s: 12780, end_s: 13380}, {start_s: 18420, end_s: 19020}, {start_s: 24060, end_s: 24660}]}
+  - {a: COM1, b: GS, windows: [{start_s: 2400, end_s: 2580}, {start_s: 5220, end_s: 5400}, {start_s: 8040, end_s: 8220}, {start_s: 10860, end_s: 11040}, {start_s: 13680, end_s: 13860}, {start_s: 16500, end_s: 16680}, {start_s: 19320, end_s: 19500}, {start_s: 22140, end_s: 22320}, {start_s: 24960, end_s: 25140}, {start_s: 27780, end_s: 27960}]}
+  - {a: COM2, b: GS, windows: [{start_s: 3900, end_s: 4080}, {start_s: 6720, end_s: 6900}, {start_s: 9540, end_s: 9720}, {start_s: 12360, end_s: 12540}, {start_s: 15180, end_s: 15360}, {start_s: 18000, end_s: 18180}, {start_s: 20820, end_s: 21000}, {start_s: 23640, end_s: 23820}, {start_s: 26460, end_s: 26640}]}
