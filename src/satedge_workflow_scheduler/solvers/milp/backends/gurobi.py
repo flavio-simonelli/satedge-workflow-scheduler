@@ -157,11 +157,20 @@ class GurobiBackend:
         else:
             outcome = BackendStatus.NO_SOLUTION
 
+        nodes = float(self._model.NodeCount) if self._model.IsMIP else None
+        runtime = float(self._model.Runtime)
         if not has_solution:
-            return SolveResult(outcome)
+            return SolveResult(outcome, nodes=nodes, runtime=runtime)
 
         values = {v: float(var.X) for v, var in enumerate(self._vars)}
         gap = float(self._model.MIPGap) if self._model.IsMIP else None
+        bound = float(self._model.ObjBound) if self._model.IsMIP else None
         return SolveResult(
-            outcome, values, objective=float(self._model.ObjVal), gap=gap
+            outcome,
+            values,
+            objective=float(self._model.ObjVal),
+            gap=gap,
+            bound=bound,
+            nodes=nodes,
+            runtime=runtime,
         )

@@ -137,6 +137,9 @@ def _schedule(
     return Schedule(tuple(executions), tuple(transfers))
 
 
+_MILP_REJECTION = "rifiutata dal MILP: la soluzione ottima non la serve"
+
+
 def _outcomes(
     instance: ProblemInstance,
     data: ModelData,
@@ -151,7 +154,8 @@ def _outcomes(
             _value(model.variables.rejection(r), values) > _BINARY_THRESHOLD
         )
         if rejected:
-            outcomes.append(RequestOutcome(r, accepted=False))
+            reason = data.unrealizable_reason(r) or _MILP_REJECTION
+            outcomes.append(RequestOutcome(r, accepted=False, rejection_reason=reason))
         else:
             if routed:
                 delivery = _delivery(instance, schedule, r)

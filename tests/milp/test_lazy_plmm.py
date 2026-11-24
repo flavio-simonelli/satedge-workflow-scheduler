@@ -119,9 +119,9 @@ def test_the_lazy_loop_adds_s1_and_reaches_the_eager_optimum() -> None:
 
     instance = _tight()
     data = ModelData(instance, DeadlineMode.HARD)
-    eager = DirectSolve().solve(instance, data, PLMM, _gurobi())
+    eager = DirectSolve().solve(instance, data, PLMM, _gurobi()).solution
     lazy = LazySolve([LazyPlmm()])
-    solution = lazy.solve(instance, data, LAZY, _gurobi())
+    solution = lazy.solve(instance, data, LAZY, _gurobi()).solution
 
     assert lazy.rounds == (
         {LazyGroup.PLMM: frozenset()},
@@ -144,7 +144,7 @@ def test_the_two_formulations_agree_when_the_memory_is_full() -> None:
     responses = []
     for formulation in (PlmmFormulation.FLOW, PlmmFormulation.EVENTS):
         config = MilpConfig(level=Level.PLMM_CAPACITY, plmm_formulation=formulation)
-        solution = DirectSolve().solve(instance, data, config, _gurobi())
+        solution = DirectSolve().solve(instance, data, config, _gurobi()).solution
         assert check(instance, solution, DeadlineMode.HARD) == ()
         assert solution.objective is not None
         responses.append(solution.objective.response)

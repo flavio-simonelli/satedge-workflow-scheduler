@@ -16,6 +16,7 @@ The choices of the family come from :class:`SequentialConfig`; the solver only a
 
 from __future__ import annotations
 
+import time
 from collections.abc import Mapping
 
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
@@ -37,6 +38,7 @@ from satedge_workflow_scheduler.scheduling.feasibility import check
 from satedge_workflow_scheduler.scheduling.objective import evaluate
 from satedge_workflow_scheduler.scheduling.screening import unrealizable_reason
 from satedge_workflow_scheduler.solvers.errors import InfeasibleModelError, SolverError
+from satedge_workflow_scheduler.solvers.run import SolverRun, SolveStatistics
 from satedge_workflow_scheduler.solvers.sequential.config import SequentialConfig
 from satedge_workflow_scheduler.solvers.sequential.errors import CommittedCalendarError
 from satedge_workflow_scheduler.solvers.sequential.factory import (
@@ -67,13 +69,24 @@ class SequentialSolver:
         self._config = config
 
     def solve(self, instance: ProblemInstance) -> Solution:
-        """Return a schedule for ``instance``.
+        """Return a schedule for ``instance``, as :meth:`run` does.
+
+        Raises:
+            InfeasibleModelError: In soft mode, if some request cannot be delivered by the
+                horizon.
+            SolverError: If the calendar violates the model, which is a bug.
+        """
+        return self.run(instance).solution
+
+    def run(self, instance: ProblemInstance) -> SolverRun:
+        """Return a schedule for ``instance``, with the statistics of the run.
 
         Raises:
             InfeasibleModelError: In soft mode, if some request cannot be delivered by the
                 horizon. Its ``reasons`` gives the reason for each such request.
             SolverError: If the calendar violates the model, which is a bug.
         """
+        started = time.monotonic()
         config = self._config
         mode = config.deadline
         ordering = ordering_for(config.ordering)
@@ -118,7 +131,10 @@ class SequentialSolver:
                 raise SolverError(
                     f"sequential heuristic: the calendar violates the model:\n{lines}"
                 )
-        return solution
+        statistics = SolveStatistics(
+            method="sequential", wall_time_s=time.monotonic() - started
+        )
+        return SolverRun(solution, statistics)
 
 
 def _solution(

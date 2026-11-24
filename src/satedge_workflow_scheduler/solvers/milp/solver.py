@@ -11,7 +11,9 @@ can use a backend that needs no licence.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
+from dataclasses import replace
 
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
 from satedge_workflow_scheduler.domain.solution import Solution
@@ -19,6 +21,7 @@ from satedge_workflow_scheduler.solvers.milp.backends.ports import MilpBackend
 from satedge_workflow_scheduler.solvers.milp.config import MilpConfig
 from satedge_workflow_scheduler.solvers.milp.model_data import ModelData
 from satedge_workflow_scheduler.solvers.milp.strategy import strategy_for
+from satedge_workflow_scheduler.solvers.run import SolverRun
 
 
 class MilpSolver:
@@ -44,6 +47,18 @@ class MilpSolver:
             InfeasibleModelError: If the solver proves that the model has no solution.
             SolverError: If the solver fails, or stops without a valid solution.
         """
+        return self.run(instance).solution
+
+    def run(self, instance: ProblemInstance) -> SolverRun:
+        """The solution of ``instance`` found by the MILP, with the statistics of the solve.
+
+        Raises:
+            InfeasibleModelError: If the solver proves that the model has no solution.
+            SolverError: If the solver fails, or stops without a valid solution.
+        """
+        started = time.monotonic()
         data = ModelData(instance, self._config.deadline)
         strategy = strategy_for(self._config)
-        return strategy.solve(instance, data, self._config, self._backend)
+        run = strategy.solve(instance, data, self._config, self._backend)
+        statistics = replace(run.statistics, wall_time_s=time.monotonic() - started)
+        return SolverRun(run.solution, statistics)

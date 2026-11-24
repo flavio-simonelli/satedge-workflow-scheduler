@@ -12,6 +12,7 @@ the one of the first solve, up to a tolerance; otherwise the first solution is k
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
 
 from satedge_workflow_scheduler.solvers.milp.backends.ports import (
     BackendStatus,
@@ -25,6 +26,13 @@ _RELATIVE_TOLERANCE = 1e-6
 """Relative tolerance on the objective: a polished solution may be this much worse, rounding aside."""
 
 
+def _total_runtime(first: SolveResult, second: SolveResult) -> float | None:
+    """The time of both solves, or ``None`` if the backend reports no time."""
+    if first.runtime is None or second.runtime is None:
+        return None
+    return first.runtime + second.runtime
+
+
 def polish(
     backend: MilpBackend,
     binaries: Sequence[Var],
@@ -32,6 +40,8 @@ def polish(
     params: SolveParams,
 ) -> SolveResult:
     """The polished solution of ``first``, or ``first`` itself if the polish does not improve it.
+
+    When the second solve runs, the runtime of the result is the time of both solves.
 
     Args:
         backend: The backend that solved the model; its bounds are changed by this function.
@@ -47,9 +57,18 @@ def polish(
         value = round(first.values.get(var, 0.0))
         backend.set_bounds(var, float(value), float(value))
     second = backend.solve(params)
+    runtime = _total_runtime(first, second)
     if second.status is not BackendStatus.OPTIMAL or second.objective is None:
-        return first
+        return replace(first, runtime=runtime)
     slack = _RELATIVE_TOLERANCE * (1.0 + abs(first.objective))
     if second.objective > first.objective + slack:
-        return first
-    return SolveResult(first.status, second.values, second.objective, second.gap)
+        return replace(first, runtime=runtime)
+    return SolveResult(
+        first.status,
+        second.values,
+        second.objective,
+        second.gap,
+        bound=first.bound,
+        nodes=first.nodes,
+        runtime=runtime,
+    )

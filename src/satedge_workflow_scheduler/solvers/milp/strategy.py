@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Hashable, Mapping, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Any, Protocol
 
 from satedge_workflow_scheduler.domain.instance import ProblemInstance
@@ -40,9 +40,10 @@ from satedge_workflow_scheduler.solvers.milp.backends.ports import (
     BackendStatus,
     MilpBackend,
     SolveParams,
+    SolveResult,
 )
 from satedge_workflow_scheduler.solvers.milp.blocks.base import BuildContext
-from satedge_workflow_scheduler.solvers.milp.builder import ModelBuilder
+from satedge_workflow_scheduler.solvers.milp.builder import BuiltModel, ModelBuilder
 from satedge_workflow_scheduler.solvers.milp.config import LazyGroup, MilpConfig
 from satedge_workflow_scheduler.solvers.milp.decoding import decode
 from satedge_workflow_scheduler.solvers.milp.encoding import encode
@@ -57,6 +58,7 @@ from satedge_workflow_scheduler.solvers.milp.reductions import (
     Reductions,
     reductions_for,
 )
+from satedge_workflow_scheduler.solvers.run import SolverRun, SolveStatistics
 from satedge_workflow_scheduler.solvers.sequential.config import SequentialConfig
 from satedge_workflow_scheduler.solvers.sequential.solver import SequentialSolver
 
@@ -72,7 +74,7 @@ class SolveStrategy(Protocol):
         data: ModelData,
         config: MilpConfig,
         backend: BackendFactory,
-    ) -> Solution:
+    ) -> SolverRun:
         """The solution of ``instance``.
 
         Raises:
@@ -104,6 +106,36 @@ def warm_start_of(
         return None
 
 
+@dataclass(frozen=True)
+class _Attempt:
+    """One solve of a model: its solution, the result of the backend and the model."""
+
+    solution: Solution
+    result: SolveResult
+    model: BuiltModel
+
+
+def _statistics(attempts: Sequence[_Attempt]) -> SolveStatistics:
+    """The statistics of a solve that solved ``attempts`` models.
+
+    The times and the nodes add up over the rounds. The bound, the gap and the size of the model
+    are those of the last round, whose solution is the one returned.
+    """
+    last = attempts[-1]
+    runtimes = [a.result.runtime for a in attempts if a.result.runtime is not None]
+    nodes = [a.result.nodes for a in attempts if a.result.nodes is not None]
+    return SolveStatistics(
+        method="milp",
+        solver_time_s=sum(runtimes) if runtimes else None,
+        bound=last.result.bound,
+        gap=last.result.gap,
+        nodes=sum(nodes) if nodes else None,
+        rounds=len(attempts),
+        binary_variables=len(last.model.binaries),
+        constraints=sum(last.model.rows.values()),
+    )
+
+
 def solve_once(
     instance: ProblemInstance,
     data: ModelData,
@@ -113,7 +145,7 @@ def solve_once(
     restricted: Restricted | None,
     params: SolveParams,
     start: Schedule | None = None,
-) -> Solution:
+) -> _Attempt:
     """Build the model with ``reductions``, with the lazy groups of ``restricted`` on their keys
     only, give it the starting calendar ``start`` if there is one, solve it once, and decode it.
 
@@ -136,7 +168,8 @@ def solve_once(
         raise InfeasibleModelError("the model has no solution")
     if result.status in (BackendStatus.ERROR, BackendStatus.NO_SOLUTION):
         raise SolverError(f"the solver ended with status {result.status}")
-    return decode(instance, data, model, result.values, result.status)
+    solution = decode(instance, data, model, result.values, result.status)
+    return _Attempt(solution, result, model)
 
 
 class DirectSolve:
@@ -148,7 +181,7 @@ class DirectSolve:
         data: ModelData,
         config: MilpConfig,
         backend: BackendFactory,
-    ) -> Solution:
+    ) -> SolverRun:
         """The solution of ``instance``.
 
         Raises:
@@ -158,9 +191,10 @@ class DirectSolve:
         """
         reductions = reductions_for(data, config.reductions)
         start = warm_start_of(instance, data, config)
-        return solve_once(
+        attempt = solve_once(
             instance, data, reductions, config, backend, None, config.solve, start
         )
+        return SolverRun(attempt.solution, _statistics([attempt]))
 
 
 class LazyConstraint(Protocol):
@@ -212,7 +246,7 @@ class LazySolve:
         data: ModelData,
         config: MilpConfig,
         backend: BackendFactory,
-    ) -> Solution:
+    ) -> SolverRun:
         """The solution of the complete model, found by the lazy loop.
 
         The time limit of the configuration is for the whole loop: each round gets what is
@@ -232,18 +266,21 @@ class LazySolve:
             c.group: frozenset() for c in self._constraints
         }
         rounds: list[Mapping[LazyGroup, frozenset[Any]]] = []
+        attempts: list[_Attempt] = []
         while True:
             rounds.append(dict(written))
             self.rounds = tuple(rounds)
             params = _remaining(config.solve, started)
-            solution = solve_once(
+            attempt = solve_once(
                 instance, data, reductions, config, backend, written, params, start
             )
+            attempts.append(attempt)
+            solution = attempt.solution
             violated = {
                 c.group: c.violations(instance, solution) for c in self._constraints
             }
             if not any(violated.values()):
-                return solution
+                return SolverRun(solution, _statistics(attempts))
             new = {group: keys - written[group] for group, keys in violated.items()}
             if not any(new.values()):
                 still = {g.value: sorted(map(str, k)) for g, k in violated.items() if k}

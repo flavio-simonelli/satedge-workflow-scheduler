@@ -55,7 +55,8 @@ def test_a_polish_that_gets_worse_is_not_accepted() -> None:
     x = backend.add_var(0.0, 1.0, VarKind.BINARY, "x")
     backend.scripted = SolveResult(BackendStatus.OPTIMAL, {x: 1.0}, objective=5.0)
     first = SolveResult(BackendStatus.OPTIMAL, {x: 1.0}, objective=2.0)
-    assert polish(backend, [x], first, SolveParams()) is first
+    kept = polish(backend, [x], first, SolveParams())
+    assert kept.values == first.values and kept.objective == first.objective
 
 
 def test_a_polish_that_is_infeasible_keeps_the_first_solution() -> None:
@@ -63,7 +64,19 @@ def test_a_polish_that_is_infeasible_keeps_the_first_solution() -> None:
     x = backend.add_var(0.0, 1.0, VarKind.BINARY, "x")
     backend.scripted = SolveResult(BackendStatus.INFEASIBLE)
     first = SolveResult(BackendStatus.OPTIMAL, {x: 1.0}, objective=2.0)
-    assert polish(backend, [x], first, SolveParams()) is first
+    kept = polish(backend, [x], first, SolveParams())
+    assert kept.status is first.status and kept.values == first.values
+    assert kept.objective == first.objective
+
+
+def test_the_runtime_of_a_polish_is_the_time_of_both_solves() -> None:
+    backend = FakeRecordingBackend()
+    x = backend.add_var(0.0, 1.0, VarKind.BINARY, "x")
+    backend.scripted = SolveResult(
+        BackendStatus.OPTIMAL, {x: 1.0}, objective=2.0, runtime=2.0
+    )
+    first = SolveResult(BackendStatus.OPTIMAL, {x: 1.0}, objective=2.0, runtime=1.0)
+    assert polish(backend, [x], first, SolveParams()).runtime == pytest.approx(3.0)
 
 
 def test_the_polish_with_gurobi_keeps_the_optimum_of_the_routing_level() -> None:

@@ -63,12 +63,18 @@ class SolveResult:
         values: Value of each variable in the incumbent, empty if there is none.
         objective: Objective value of the incumbent, if there is one.
         gap: Relative gap reached, if the solver reports it.
+        bound: Best bound on the objective found by the solver, for a MIP.
+        nodes: Number of branch-and-bound nodes explored, for a MIP.
+        runtime: Seconds the solver spent solving, if it reports them.
     """
 
     status: BackendStatus
     values: Mapping[Var, float] = field(default_factory=dict)
     objective: float | None = None
     gap: float | None = None
+    bound: float | None = None
+    nodes: float | None = None
+    runtime: float | None = None
 
 
 class ModelSink(Protocol):
