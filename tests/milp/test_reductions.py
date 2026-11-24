@@ -340,7 +340,7 @@ def test_under_soft_deadlines_it_makes_the_instance_infeasible() -> None:
     with pytest.raises(InfeasibleModelError) as error:
         Reductions.exact(data)
     assert set(error.value.reasons) == {"r2"}
-    assert "fits in no computing window" in error.value.reasons["r2"]
+    assert "non entra in nessuna finestra di calcolo" in error.value.reasons["r2"]
 
 
 # --- the optimum does not change (Gurobi) -------------------------------------------------

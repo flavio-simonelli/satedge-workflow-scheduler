@@ -142,7 +142,7 @@ class EftScheduler:
         if not candidates:
             return self._no_candidate(instance, request, bounds, task_index, progress)
         failure: PlanFailure = PlanFailure(
-            f"task {task_index}: no candidate has room in the PLMM"
+            f"task {task_index + 1}: nessun satellite candidato ha spazio nella PLMM"
         )
         tried = False
         for candidate in candidates:
@@ -187,7 +187,7 @@ class EftScheduler:
                 best = (deliveries[0].arrival, candidate, after, deliveries[0])
         if best is None:
             return PlanFailure(
-                f"task {task_index}: no candidate delivers the output by the limit"
+                f"task {task_index + 1}: nessun satellite candidato consegna l'output entro il limite"
             )
         delivery, _, chosen, route = best
         final = _transfers(request.id, len(request.tasks), route)
@@ -211,9 +211,11 @@ class EftScheduler:
         )
         if self._candidates(instance, request, bounds, task_index, relaxed):
             return PlanFailure(
-                f"task {task_index}: no room in the PLMM for its input on the way"
+                f"task {task_index + 1}: nessuno spazio nella PLMM per il suo input lungo il percorso"
             )
-        return PlanFailure(f"task {task_index}: no satellite can run it in time")
+        return PlanFailure(
+            f"task {task_index + 1}: nessun satellite può eseguirlo in tempo"
+        )
 
     def _candidates(
         self,

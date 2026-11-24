@@ -27,9 +27,9 @@ def unrealizable_reason(
     """Why ``request`` can never be delivered by ``bounds.limit``, or ``None`` if it may be.
 
     ``bounds`` are the a priori bounds of the request (:func:`request_bounds`), which the
-    caller usually needs anyway. The reason names the first task that can run on no
-    satellite, and says whether it is longer than every computing window or only cannot
-    be placed in time.
+    caller usually needs anyway. The reason, in Italian since it reaches the user, names the
+    first task that can run on no satellite (numbered from 1), and says whether it is longer
+    than every computing window or only cannot be placed in time.
     """
     for task_index in range(len(request.tasks)):
         if bounds.executable_satellites(task_index):
@@ -40,10 +40,10 @@ def unrealizable_reason(
             for w in s.hpc_windows
         )
         if not fits_somewhere:
-            return f"task {task_index} fits in no computing window"
+            return f"il task {task_index + 1} non entra in nessuna finestra di calcolo"
         return (
-            f"task {task_index} can run on no satellite in time to deliver by "
-            f"{bounds.limit} s"
+            f"il task {task_index + 1} non può essere eseguito su nessun satellite "
+            f"in tempo per consegnare entro {bounds.limit:g} s"
         )
     return None
 

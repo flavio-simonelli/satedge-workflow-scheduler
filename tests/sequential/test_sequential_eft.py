@@ -66,7 +66,10 @@ def test_a_full_plmm_at_the_origin_fails_the_request_with_its_reason() -> None:
     reservations = Reservations().with_occupancies([("S1", blocking)])
     plan = _plan(reservations)
     assert isinstance(plan, PlanFailure)
-    assert plan.reason == "task 0: no room in the PLMM for its input on the way"
+    assert (
+        plan.reason
+        == "task 1: nessuno spazio nella PLMM per il suo input lungo il percorso"
+    )
 
 
 def test_without_backtracks_the_search_is_the_greedy_placement() -> None:

@@ -71,14 +71,16 @@ def test_a_feasible_request_has_no_reason() -> None:
 def test_a_task_longer_than_every_window_fits_nowhere() -> None:
     instance = _instance(_request(), window=10.0)
     reason = _reason(_request(), instance, limit=100.0)
-    assert reason == "task 0 fits in no computing window"
+    assert reason == "il task 1 non entra in nessuna finestra di calcolo"
 
 
 def test_the_delivery_to_the_ground_counts() -> None:
     # The pipeline alone ends at 15, before the limit of 21, but its output cannot
     # reach the ground before 22.
     reason = _reason(_request(), _instance(_request()), limit=21.0)
-    assert reason == "task 0 can run on no satellite in time to deliver by 21.0 s"
+    assert reason == (
+        "il task 1 non può essere eseguito su nessun satellite in tempo per consegnare entro 21 s"
+    )
 
 
 def test_hard_mode_screens_against_the_deadline() -> None:

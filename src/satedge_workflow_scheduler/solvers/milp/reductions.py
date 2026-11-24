@@ -143,7 +143,8 @@ class Reductions:
                     excluded.add(r)
                 else:
                     impossible[r] = (
-                        data.unrealizable_reason(r) or "a task can run on no satellite"
+                        data.unrealizable_reason(r)
+                        or "un task non può essere eseguito su nessun satellite"
                     )
             ranges[r] = found
         if impossible:
