@@ -4,14 +4,19 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
         with:
           enable-cache: true
 
@@ -19,13 +24,13 @@ jobs:
         run: uv lock --check
 
       - name: Lint
-        run: uv run ruff check .
+        run: uv run --locked --no-build ruff check .
 
       - name: Format
-        run: uv run ruff format --check .
+        run: uv run --locked --no-build ruff format --check .
 
       - name: Type check
-        run: uv run mypy --strict src tests
+        run: uv run --locked --no-build mypy --strict src tests
 
       - name: Tests
-        run: uv run pytest
+        run: uv run --locked --no-build pytest

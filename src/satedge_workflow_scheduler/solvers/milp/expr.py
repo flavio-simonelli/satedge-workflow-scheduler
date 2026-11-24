@@ -49,7 +49,7 @@ class LinExpr:
         self, terms: Mapping[Var, float] | None = None, constant: float = 0.0
     ) -> None:
         self._terms: dict[Var, float] = {
-            v: float(c) for v, c in (terms or {}).items() if c != 0.0
+            v: float(c) for v, c in (terms or {}).items() if c
         }
         self.constant = float(constant)
 
@@ -80,7 +80,7 @@ class LinExpr:
         expr = _as_expr(other)
         for var, coef in expr._terms.items():
             total = self._terms.get(var, 0.0) + coef
-            if total == 0.0:
+            if not total:
                 self._terms.pop(var, None)
             else:
                 self._terms[var] = total
