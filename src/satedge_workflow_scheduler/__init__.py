@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from satedge-workflow-scheduler!")
+"""Scheduler of workflow requests on a satellite constellation: MILP and sequential solvers."""
